@@ -1,0 +1,201 @@
+.login-page-container {
+    --background: linear-gradient(135deg, #dbeafe 0%, #eff6ff 50%, #f9fafb 100%);
+    --color: #1e3a5f;
+    --primary-color: #2563eb;
+    --text-muted: #64748b;
+    
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    width: 100vw;
+    background: var(--background) !important;
+    color: var(--color);
+    font-family: "Poppins", system-ui, sans-serif;
+    letter-spacing: 1px;
+    margin: 0;
+    padding: 1rem;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 9999;
+    box-sizing: border-box;
+}
+
+.login-container {
+    position: relative;
+    width: 22.2rem;
+}
+
+.form-container {
+    border: 1px solid rgba(37, 99, 235, 0.15);
+    box-shadow: 0 4px 24px rgba(37, 99, 235, 0.1), 0 0 0 1px rgba(37, 99, 235, 0.05);
+    border-radius: 16px;
+    backdrop-filter: blur(20px);
+    background: rgba(255, 255, 255, 0.9);
+    z-index: 99;
+    padding: 2rem;
+    position: relative;
+}
+
+.form-container h1 {
+    font-size: 2.5rem;
+    margin: 0;
+    margin-top: 1rem;
+    text-align: center;
+}
+
+.login-container form input {
+    display: block;
+    padding: 14.5px;
+    width: 100%;
+    margin: 2rem 0;
+    color: var(--color);
+    outline: none;
+    background-color: rgba(241, 245, 249, 0.8);
+    border: 1px solid rgba(37, 99, 235, 0.2);
+    border-radius: 8px;
+    font-weight: 500;
+    letter-spacing: 0.8px;
+    font-size: 15px;
+    backdrop-filter: blur(15px);
+    box-sizing: border-box;
+    transition: all 0.2s ease;
+}
+
+.login-container form input::placeholder {
+    color: var(--text-muted);
+}
+
+.login-container form input:focus {
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+    border-color: var(--primary-color);
+    animation: wobble 0.3s ease-in;
+}
+
+.login-container form input:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.login-container form button {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    color: #ffffff;
+    display: block;
+    padding: 13px;
+    border-radius: 8px;
+    outline: none;
+    font-size: 18px;
+    letter-spacing: 1.5px;
+    font-weight: bold;
+    width: 100%;
+    cursor: pointer;
+    margin-bottom: 2rem;
+    transition: all 0.2s ease-in-out;
+    border: none;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+}
+
+.login-container form button:hover:not(:disabled) {
+    box-shadow: 0 6px 16px rgba(37, 99, 235, 0.4);
+    transform: translateY(-2px);
+}
+
+.login-container form button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.circle {
+    width: 8rem;
+    height: 8rem;
+    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+    border-radius: 50%;
+    position: absolute;
+    opacity: 0.7;
+}
+
+.illustration {
+    display: block;
+    width: 240px;
+    height: auto;
+    margin: 0 auto 1.5rem auto;
+    position: relative;
+    top: auto;
+    right: auto;
+}
+
+.circle-one {
+    top: 0;
+    left: 0;
+    z-index: -1;
+    transform: translate(-45%, -45%);
+}
+
+.circle-two {
+    bottom: 0;
+    right: 0;
+    z-index: -1;
+    transform: translate(45%, 45%);
+}
+
+.register-forget {
+    margin: 1rem 0;
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+}
+
+.register-forget span {
+    color: var(--text-muted);
+}
+
+.opacity {
+    opacity: 0.6;
+}
+
+.error-message {
+    background-color: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #dc2626;
+    padding: 12px;
+    border-radius: 8px;
+    text-align: center;
+    font-size: 14px;
+    margin-bottom: 1rem;
+}
+
+@keyframes wobble {
+    0% {
+        transform: scale(1.025);
+    }
+    25% {
+        transform: scale(1);
+    }
+    75% {
+        transform: scale(1.025);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+/* Responsive */
+@media (max-width: 400px) {
+    .login-container {
+        width: 100%;
+    }
+    
+    .illustration {
+        width: 70%;
+        top: -10%;
+    }
+    
+    .circle {
+        width: 6rem;
+        height: 6rem;
+    }
+}
