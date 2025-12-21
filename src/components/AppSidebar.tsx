@@ -14,14 +14,36 @@ import {
   UserCog,
   Heart,
   User,
+  Stethoscope,
+  MapPin,
+  Store,
 } from "lucide-react"
 import { cn } from "./ui/utils"
+import { useApp } from "../context/AppContext"
 
 interface AppSidebarProps {
   currentPath: string
   userRole: 'admin_global' | 'admin_nagari' | 'staff_nagari' | 'warga'
   nagariName: string
   collapsed?: boolean
+}
+
+// Mapping menu ke permission key
+const menuPermissionMap: Record<string, string> = {
+  'Dashboard': 'dashboard',
+  'Kependudukan': 'data_warga', // Jika punya data_warga atau data_keluarga
+  'Wilayah': 'data_warga', // Same permission as Kependudukan
+  'Pelayanan Surat': 'surat',
+  'CMS': 'cms',
+  'Keuangan': 'keuangan',
+  'GIS': 'gis',
+  'Data Sosial': 'data_sosial',
+  'UMKM': 'data_sosial', // UMKM uses same permission as data sosial
+  'Kader Posyandu': 'kader',
+  'Pengaduan': 'pengaduan',
+  'Arsip & Dokumen': 'arsip',
+  'User Management': 'user_management',
+  'Settings': 'settings',
 }
 
 export function AppSidebar({ 
@@ -31,6 +53,7 @@ export function AppSidebar({
   collapsed = false
 }: AppSidebarProps) {
   const location = useLocation()
+  const { hasPermission, user } = useApp()
   const [openMenus, setOpenMenus] = React.useState<string[]>([])
 
   const navigation = [
@@ -50,6 +73,14 @@ export function AppSidebar({
       ],
     },
     {
+      title: "Management Jorong",
+      icon: MapPin,
+      url: "/wilayah",
+      items: [
+        { title: "Kelola Jorong", url: "/wilayah/jorong" },
+      ],
+    },
+    {
       title: "Pelayanan Surat",
       icon: FileText,
       url: "/pelayanan",
@@ -59,17 +90,21 @@ export function AppSidebar({
       ],
     },
     {
-      title: "CMS",
+      title: "Websistem & CMS",
       icon: Globe,
       url: "/cms",
       items: [
-        { title: "CMS Dashboard", url: "/cms/dashboard" },
-        { title: "Kelola Berita", url: "/cms/news" },
-        { title: "Pengaturan Situs", url: "/cms/settings" },
+        { title: "Dashboard", url: "/cms/dashboard" },
+        { title: "Berita & Artikel", url: "/cms/news" },
+        { title: "Halaman Statis", url: "/cms/pages" },
+        { title: "Layanan Publik", url: "/cms/services" },
+        { title: "Struktur Organisasi", url: "/cms/staff" },
+        { title: "Kategori", url: "/cms/categories" },
+        { title: "Pengaturan", url: "/cms/settings" },
       ],
     },
     {
-      title: "Keuangan",
+      title: "Keuangan Nagari",
       icon: DollarSign,
       url: "/keuangan",
       items: [
@@ -78,7 +113,7 @@ export function AppSidebar({
       ],
     },
     {
-      title: "GIS",
+      title: "WebGIS",
       icon: Map,
       url: "/gis",
       items: [
@@ -87,12 +122,32 @@ export function AppSidebar({
       ],
     },
     {
-      title: "Data Sosial",
+      title: "Data Nagari",
       icon: Heart,
       url: "/data-sosial",
       items: [
-        { title: "❤️ Data Kesehatan", url: "/data-sosial/kesehatan" },
-        { title: "💰 Data Kemiskinan", url: "/data-sosial/kemiskinan" },
+        { title: "Data Kesehatan", url: "/data-sosial/kesehatan" },
+        { title: "Data Kemiskinan", url: "/data-sosial/kemiskinan" },
+      ],
+    },
+    {
+      title: "UMKM  Nagari",
+      icon: Store,
+      url: "/umkm",
+      items: [
+        { title: "Direktori UMKM", url: "/umkm/direktori" },
+        { title: "Kategori Usaha", url: "/umkm/kategori" },
+      ],
+    },
+    {
+      title: "Kader Nagari",
+      icon: Stethoscope,
+      url: "/kader",
+      items: [
+        { title: "Manajemen Kader", url: "/kader/management" },
+        { title: "Kelompok Kader", url: "/kader/kelompok" },
+        { title: "Penugasan Kader", url: "/kader/tugas" },
+        { title: "Performa Kader", url: "/kader/performa" },
       ],
     },
     {
@@ -122,7 +177,7 @@ export function AppSidebar({
       url: "/system/user-management",
     },
     {
-      title: "Settings",
+      title: "Pengaturan",
       icon: Settings,
       url: "/system/settings",
     },
@@ -174,19 +229,37 @@ export function AppSidebar({
   }
 
   const getFilteredNavigation = () => {
-    if (userRole === 'warga') {
-      return navigation.filter(item => 
-        ['Dashboard', 'Pelayanan Surat', 'Pengaduan'].includes(item.title)
-      )
+    // Admin global melihat semua menu
+    if (userRole === 'admin_global') {
+      return navigation
     }
     
-    if (userRole === 'staff_nagari') {
-      return navigation.filter(item => 
-        !['Keuangan', 'CMS'].includes(item.title)
-      )
+    // Filter berdasarkan permissions dari context
+    return navigation.filter(item => {
+      const permissionKey = menuPermissionMap[item.title]
+      
+      // Jika tidak ada mapping permission, tampilkan (untuk backward compatibility)
+      if (!permissionKey) return true
+      
+      // Cek permission dari user
+      return hasPermission(permissionKey)
+    })
+  }
+
+  // Filter admin navigation berdasarkan permissions
+  const getFilteredAdminNavigation = () => {
+    // Admin global melihat semua menu admin
+    if (userRole === 'admin_global') {
+      return adminNavigation
     }
     
-    return navigation
+    return adminNavigation.filter(item => {
+      const permissionKey = menuPermissionMap[item.title]
+      
+      if (!permissionKey) return true
+      
+      return hasPermission(permissionKey)
+    })
   }
 
   const filteredNavigation = getFilteredNavigation()
@@ -231,9 +304,9 @@ export function AppSidebar({
           ))}
           
           {/* Admin Section - Icons only */}
-          {(userRole === 'admin_global' || userRole === 'admin_nagari') && (
+          {getFilteredAdminNavigation().length > 0 && (
             <div className="flex flex-col items-center mt-2 border-t border-blue-200 pt-2 w-full">
-              {adminNavigation.map((item) => (
+              {getFilteredAdminNavigation().map((item) => (
                 <Link
                   key={item.url}
                   to={item.url}
@@ -383,14 +456,14 @@ export function AppSidebar({
         </div>
         
         {/* Admin Section */}
-        {(userRole === 'admin_global' || userRole === 'admin_nagari') && (
+        {getFilteredAdminNavigation().length > 0 && (
           <div className="flex flex-col w-full mt-2 border-t border-blue-200 pt-1">
             <div className="w-full px-3 py-1">
               <span className="text-xs font-semibold text-blue-500 uppercase tracking-wider">
                 Administrasi
               </span>
             </div>
-            {adminNavigation.map((item) => (
+            {getFilteredAdminNavigation().map((item) => (
               <Link
                 key={item.url}
                 to={item.url}
@@ -416,15 +489,6 @@ export function AppSidebar({
           </div>
         )}
       </div>
-      
-      {/* Account Footer */}
-      <Link 
-        to="/profile"
-        className="flex items-center justify-center w-full h-14 mt-auto bg-blue-200/30 hover:bg-blue-400 text-blue-700 hover:text-white transition-all duration-200"
-      >
-        <User className="w-5 h-5 stroke-current" />
-        <span className="ml-2 text-sm font-medium">Account</span>
-      </Link>
     </div>
   )
 }

@@ -269,7 +269,7 @@ export function StuntingAnalysisDashboard() {
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <Baby className="w-7 h-7 text-pink-500" />
-            Analisis Stunting - Standar WHO
+            Analisis Balita - Standar WHO
           </h1>
           <p className="text-gray-500 mt-1">
             Sistem analisis pertumbuhan anak menggunakan standar WHO LMS (mirip Buku Pink KIA)

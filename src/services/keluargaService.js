@@ -78,9 +78,15 @@ export const keluargaService = {
   },
 
   // Export keluarga data
-  export: async (filters = {}, format = 'xlsx') => {
+  export: async (filters = {}, format = 'pdf') => {
     const params = { ...filters, format };
     return apiClient.get('/keluargas/export', params);
+  },
+
+  // Export keluarga with download and progress
+  exportWithDownload: async (filters = {}, format = 'pdf', onProgress = null) => {
+    const params = { ...filters, format };
+    return apiClient.downloadBlobWithProgress('/keluargas/export', params, onProgress);
   },
 
   // Bulk import keluarga

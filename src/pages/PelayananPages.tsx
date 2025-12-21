@@ -3,7 +3,7 @@ import { PermohonanSurat } from '../components/permohonan-surat'
 import { KelolaPermohonan } from '../components/kelola-permohonan'
 import { GISMap } from '../components/gis-map'
 import { TemplateManager } from '../components/template-manager'
-import { KeuanganDashboard } from '../components/keuangan-dashboard'
+import { KeuanganNagari } from '../components/keuangan-nagari'
 import { useApp } from '../context/AppContext'
 
 export function PermohonanSuratPage() {
@@ -55,7 +55,7 @@ export function KeuanganDashboardPage() {
   const userRole = user?.role || 'admin_nagari'
   
   return (
-    <KeuanganDashboard 
+    <KeuanganNagari 
       userRole={userRole as 'admin_global' | 'admin_nagari' | 'staff_nagari' | 'warga'}
     />
   )

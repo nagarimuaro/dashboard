@@ -15,10 +15,7 @@ export function DataKeluargaPage() {
   
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Data Keluarga</h1>
-        <p className="text-muted-foreground">Kelola data keluarga Nagari</p>
-      </div>
+     
       
       <DataKeluarga 
         userRole={userRole as any} 

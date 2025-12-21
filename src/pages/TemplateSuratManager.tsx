@@ -62,6 +62,26 @@ const showToast = (title: string, description: string, variant?: 'default' | 'de
   setTimeout(() => toast.remove(), 3000);
 };
 
+interface RequiredDocument {
+  key: string;
+  label: string;
+  type: 'ktp' | 'kk' | 'selfie_ktp' | 'photo' | 'document';
+  required: boolean;
+}
+
+interface AdditionalVariable {
+  key: string;
+  label: string;
+  type: 'text' | 'date' | 'select' | 'number';
+  options?: string[]; // for select type
+  required: boolean;
+}
+
+interface KeperluanOption {
+  label: string;
+  value: string;
+}
+
 interface SuratTemplate {
   id: number;
   nama: string;
@@ -72,6 +92,10 @@ interface SuratTemplate {
   file_name: string;
   deskripsi: string;
   persyaratan: string[];
+  required_documents: RequiredDocument[];
+  additional_variables: AdditionalVariable[];
+  requires_keperluan: boolean;
+  keperluan_options: KeperluanOption[];
   is_active: boolean;
   counter: number;
   population_effect: string;
@@ -113,6 +137,21 @@ const POPULATION_ACTIONS = [
   { value: 'create_warga', label: 'Buat Warga Baru' },
 ];
 
+const DOCUMENT_TYPES = [
+  { value: 'ktp', label: 'KTP' },
+  { value: 'kk', label: 'Kartu Keluarga (KK)' },
+  { value: 'selfie_ktp', label: 'Selfie dengan KTP' },
+  { value: 'photo', label: 'Foto' },
+  { value: 'document', label: 'Dokumen Lainnya' },
+];
+
+const VARIABLE_TYPES = [
+  { value: 'text', label: 'Teks' },
+  { value: 'date', label: 'Tanggal' },
+  { value: 'number', label: 'Angka' },
+  { value: 'select', label: 'Pilihan (Select)' },
+];
+
 export default function TemplateSuratManager() {
   const [templates, setTemplates] = useState<SuratTemplate[]>([]);
   const [loading, setLoading] = useState(false);
@@ -142,12 +181,19 @@ export default function TemplateSuratManager() {
     deskripsi: '',
     format_nomor: '{nomor}/{kode}/{bulan_romawi}/{tahun}',
     persyaratan: [] as string[],
+    required_documents: [] as RequiredDocument[],
+    additional_variables: [] as AdditionalVariable[],
+    requires_keperluan: false,
+    keperluan_options: [] as KeperluanOption[],
     population_effect: 'none',
     population_action: 'none',
     is_active: true,
     file: null as File | null
   });
   const [newPersyaratan, setNewPersyaratan] = useState('');
+  const [newDocument, setNewDocument] = useState<Partial<RequiredDocument>>({ key: '', label: '', type: 'document', required: true });
+  const [newVariable, setNewVariable] = useState<Partial<AdditionalVariable>>({ key: '', label: '', type: 'text', required: false, options: [] });
+  const [newVariableOption, setNewVariableOption] = useState('');
   
   // Preview state
   const [previewData, setPreviewData] = useState<{
@@ -212,12 +258,19 @@ export default function TemplateSuratManager() {
       deskripsi: '',
       format_nomor: '{nomor}/{kode}/{bulan_romawi}/{tahun}',
       persyaratan: [],
+      required_documents: [],
+      additional_variables: [],
+      requires_keperluan: false,
+      keperluan_options: [],
       population_effect: 'none',
       population_action: 'none',
       is_active: true,
       file: null
     });
     setNewPersyaratan('');
+    setNewDocument({ key: '', label: '', type: 'document', required: true });
+    setNewVariable({ key: '', label: '', type: 'text', required: false, options: [] });
+    setNewVariableOption('');
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -249,6 +302,71 @@ export default function TemplateSuratManager() {
     });
   };
 
+  // Required Documents helpers
+  const addRequiredDocument = () => {
+    if (newDocument.key && newDocument.label && newDocument.type) {
+      setFormData({
+        ...formData,
+        required_documents: [...formData.required_documents, newDocument as RequiredDocument]
+      });
+      setNewDocument({ key: '', label: '', type: 'document', required: true });
+    } else {
+      showToast('Error', 'Key dan Label harus diisi', 'destructive');
+    }
+  };
+
+  const removeRequiredDocument = (index: number) => {
+    setFormData({
+      ...formData,
+      required_documents: formData.required_documents.filter((_, i) => i !== index)
+    });
+  };
+
+  // Additional Variables helpers
+  const addAdditionalVariable = () => {
+    if (newVariable.key && newVariable.label && newVariable.type) {
+      const varToAdd: AdditionalVariable = {
+        key: newVariable.key,
+        label: newVariable.label,
+        type: newVariable.type as 'text' | 'date' | 'select' | 'number',
+        required: newVariable.required || false,
+        options: newVariable.type === 'select' ? newVariable.options : undefined
+      };
+      setFormData({
+        ...formData,
+        additional_variables: [...formData.additional_variables, varToAdd]
+      });
+      setNewVariable({ key: '', label: '', type: 'text', required: false, options: [] });
+      setNewVariableOption('');
+    } else {
+      showToast('Error', 'Key dan Label harus diisi', 'destructive');
+    }
+  };
+
+  const removeAdditionalVariable = (index: number) => {
+    setFormData({
+      ...formData,
+      additional_variables: formData.additional_variables.filter((_, i) => i !== index)
+    });
+  };
+
+  const addVariableOption = () => {
+    if (newVariableOption.trim()) {
+      setNewVariable({
+        ...newVariable,
+        options: [...(newVariable.options || []), newVariableOption.trim()]
+      });
+      setNewVariableOption('');
+    }
+  };
+
+  const removeVariableOption = (index: number) => {
+    setNewVariable({
+      ...newVariable,
+      options: (newVariable.options || []).filter((_, i) => i !== index)
+    });
+  };
+
   // CREATE
   const handleCreate = async () => {
     if (!formData.file || !formData.nama || !formData.kategori || !formData.kode) {
@@ -266,6 +384,10 @@ export default function TemplateSuratManager() {
       uploadFormData.append('deskripsi', formData.deskripsi);
       uploadFormData.append('format_nomor', formData.format_nomor);
       uploadFormData.append('persyaratan', JSON.stringify(formData.persyaratan));
+      uploadFormData.append('required_documents', JSON.stringify(formData.required_documents));
+      uploadFormData.append('additional_variables', JSON.stringify(formData.additional_variables));
+      uploadFormData.append('requires_keperluan', String(formData.requires_keperluan));
+      uploadFormData.append('keperluan_options', JSON.stringify(formData.keperluan_options));
       uploadFormData.append('population_effect', formData.population_effect);
       uploadFormData.append('population_action', formData.population_action);
       
@@ -291,11 +413,18 @@ export default function TemplateSuratManager() {
       deskripsi: template.deskripsi || '',
       format_nomor: template.format_nomor,
       persyaratan: template.persyaratan || [],
+      required_documents: template.required_documents || [],
+      additional_variables: template.additional_variables || [],
+      requires_keperluan: template.requires_keperluan || false,
+      keperluan_options: template.keperluan_options || [],
       population_effect: template.population_effect || 'none',
       population_action: template.population_action || 'none',
       is_active: template.is_active,
       file: null
     });
+    setNewDocument({ key: '', label: '', type: 'document', required: true });
+    setNewVariable({ key: '', label: '', type: 'text', required: false, options: [] });
+    setNewVariableOption('');
     setEditDialogOpen(true);
   };
 
@@ -326,6 +455,10 @@ export default function TemplateSuratManager() {
       updateFormData.append('deskripsi', formData.deskripsi);
       updateFormData.append('format_nomor', formData.format_nomor);
       updateFormData.append('persyaratan', JSON.stringify(formData.persyaratan));
+      updateFormData.append('required_documents', JSON.stringify(formData.required_documents));
+      updateFormData.append('additional_variables', JSON.stringify(formData.additional_variables));
+      updateFormData.append('requires_keperluan', String(formData.requires_keperluan));
+      updateFormData.append('keperluan_options', JSON.stringify(formData.keperluan_options));
       updateFormData.append('population_effect', formData.population_effect);
       updateFormData.append('population_action', formData.population_action);
       updateFormData.append('is_active', formData.is_active ? '1' : '0');
@@ -812,12 +945,215 @@ export default function TemplateSuratManager() {
               </div>
             </TabsContent>
             
-            <TabsContent value="requirements" className="space-y-4 mt-4">
-              <div>
-                <Label>Persyaratan Pengajuan</Label>
-                <div className="flex gap-2 mt-2">
+            <TabsContent value="requirements" className="space-y-6 mt-4">
+              {/* Dokumen Upload yang Diperlukan */}
+              <div className="p-4 border rounded-lg">
+                <div className="flex items-center gap-2 mb-3">
+                  <Upload className="h-4 w-4 text-blue-500" />
+                  <Label className="text-sm font-semibold">Dokumen Upload yang Diperlukan</Label>
+                </div>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Dokumen yang harus diupload pengguna saat mengajukan surat via WhatsApp
+                </p>
+                
+                <div className="grid grid-cols-4 gap-2 mb-3">
                   <Input
-                    placeholder="Tambah persyaratan..."
+                    placeholder="Key (contoh: ktp)"
+                    value={newDocument.key}
+                    onChange={(e) => setNewDocument({ ...newDocument, key: e.target.value.toLowerCase().replace(/\s/g, '_') })}
+                  />
+                  <Input
+                    placeholder="Label (contoh: KTP)"
+                    value={newDocument.label}
+                    onChange={(e) => setNewDocument({ ...newDocument, label: e.target.value })}
+                  />
+                  <Select
+                    value={newDocument.type}
+                    onValueChange={(v: string) => setNewDocument({ ...newDocument, type: v as RequiredDocument['type'] })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Tipe" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DOCUMENT_TYPES.map(t => (
+                        <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={newDocument.required}
+                      onCheckedChange={(v: boolean) => setNewDocument({ ...newDocument, required: v })}
+                    />
+                    <span className="text-xs">Wajib</span>
+                    <Button type="button" size="sm" onClick={addRequiredDocument}>
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+                
+                {formData.required_documents.length > 0 ? (
+                  <div className="space-y-2">
+                    {formData.required_documents.map((doc, i) => (
+                      <div key={i} className="flex items-center justify-between text-sm bg-blue-50 p-2 rounded border border-blue-200">
+                        <div className="flex items-center gap-3">
+                          <Badge variant="outline" className="text-xs">{doc.key}</Badge>
+                          <span className="font-medium">{doc.label}</span>
+                          <Badge variant="secondary" className="text-xs">
+                            {DOCUMENT_TYPES.find(t => t.value === doc.type)?.label || doc.type}
+                          </Badge>
+                          {doc.required && <Badge className="text-xs bg-red-500">Wajib</Badge>}
+                        </div>
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => removeRequiredDocument(i)}>
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Belum ada dokumen yang diperlukan</p>
+                )}
+              </div>
+
+              {/* Variable Tambahan */}
+              <div className="p-4 border rounded-lg">
+                <div className="flex items-center gap-2 mb-3">
+                  <List className="h-4 w-4 text-purple-500" />
+                  <Label className="text-sm font-semibold">Variable Tambahan</Label>
+                </div>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Data tambahan yang diminta dari pengguna tetapi TIDAK dimasukkan ke dalam surat
+                </p>
+                
+                <div className="space-y-3 mb-3 p-3 bg-muted/50 rounded-lg">
+                  <div className="grid grid-cols-4 gap-2">
+                    <Input
+                      placeholder="Key (contoh: alamat_tujuan)"
+                      value={newVariable.key}
+                      onChange={(e) => setNewVariable({ ...newVariable, key: e.target.value.toLowerCase().replace(/\s/g, '_') })}
+                    />
+                    <Input
+                      placeholder="Label (contoh: Alamat Tujuan)"
+                      value={newVariable.label}
+                      onChange={(e) => setNewVariable({ ...newVariable, label: e.target.value })}
+                    />
+                    <Select
+                      value={newVariable.type}
+                      onValueChange={(v: string) => setNewVariable({ ...newVariable, type: v as AdditionalVariable['type'] })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Tipe" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {VARIABLE_TYPES.map(t => (
+                          <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={newVariable.required}
+                        onCheckedChange={(v: boolean) => setNewVariable({ ...newVariable, required: v })}
+                      />
+                      <span className="text-xs">Wajib</span>
+                    </div>
+                  </div>
+                  
+                  {newVariable.type === 'select' && (
+                    <div className="pl-2 border-l-2 border-purple-300">
+                      <Label className="text-xs text-muted-foreground mb-2 block">Opsi Pilihan:</Label>
+                      <div className="flex gap-2 mb-2">
+                        <Input
+                          placeholder="Tambah opsi..."
+                          value={newVariableOption}
+                          onChange={(e) => setNewVariableOption(e.target.value)}
+                          onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addVariableOption())}
+                          className="text-sm"
+                        />
+                        <Button type="button" size="sm" variant="outline" onClick={addVariableOption}>
+                          <Plus className="h-3 w-3" />
+                        </Button>
+                      </div>
+                      {(newVariable.options || []).length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {newVariable.options?.map((opt, i) => (
+                            <Badge key={i} variant="secondary" className="text-xs flex items-center gap-1">
+                              {opt}
+                              <X className="h-2 w-2 cursor-pointer" onClick={() => removeVariableOption(i)} />
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  <Button type="button" size="sm" onClick={addAdditionalVariable} className="w-full">
+                    <Plus className="h-4 w-4 mr-2" /> Tambah Variable
+                  </Button>
+                </div>
+                
+                {formData.additional_variables.length > 0 ? (
+                  <div className="space-y-2">
+                    {formData.additional_variables.map((v, i) => (
+                      <div key={i} className="flex items-center justify-between text-sm bg-purple-50 p-2 rounded border border-purple-200">
+                        <div className="flex items-center gap-3 flex-wrap">
+                          <Badge variant="outline" className="text-xs font-mono">{v.key}</Badge>
+                          <span className="font-medium">{v.label}</span>
+                          <Badge variant="secondary" className="text-xs">
+                            {VARIABLE_TYPES.find(t => t.value === v.type)?.label || v.type}
+                          </Badge>
+                          {v.required && <Badge className="text-xs bg-red-500">Wajib</Badge>}
+                          {v.type === 'select' && v.options && v.options.length > 0 && (
+                            <span className="text-xs text-muted-foreground">
+                              Opsi: {v.options.join(', ')}
+                            </span>
+                          )}
+                        </div>
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => removeAdditionalVariable(i)}>
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Belum ada variable tambahan</p>
+                )}
+              </div>
+
+              {/* Keperluan Surat */}
+              <div className="p-4 border rounded-lg bg-purple-50/50">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-purple-600" />
+                    <Label className="text-sm font-semibold">Keperluan Surat</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="requires_keperluan_edit" className="text-xs">Aktifkan</Label>
+                    <Switch
+                      id="requires_keperluan_edit"
+                      checked={formData.requires_keperluan}
+                      onCheckedChange={(checked: boolean) => setFormData({ ...formData, requires_keperluan: checked })}
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Jika diaktifkan, pengguna akan diminta mengisi keperluan surat saat pengajuan via WhatsApp (contoh: mengurus KIS, beasiswa, keperluan bank, dll)
+                </p>
+              </div>
+
+              {/* Persyaratan Teks (Legacy) */}
+              <div className="p-4 border rounded-lg border-dashed opacity-70">
+                <div className="flex items-center gap-2 mb-3">
+                  <FileText className="h-4 w-4 text-gray-500" />
+                  <Label className="text-sm font-semibold">Persyaratan Teks (Info Tambahan)</Label>
+                </div>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Informasi persyaratan dalam bentuk teks yang ditampilkan kepada pengguna
+                </p>
+                
+                <div className="flex gap-2 mb-3">
+                  <Input
+                    placeholder="Tambah persyaratan teks..."
                     value={newPersyaratan}
                     onChange={(e) => setNewPersyaratan(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addPersyaratan())}
@@ -828,16 +1164,11 @@ export default function TemplateSuratManager() {
                 </div>
                 
                 {formData.persyaratan.length > 0 && (
-                  <ul className="mt-3 space-y-2">
+                  <ul className="space-y-2">
                     {formData.persyaratan.map((p, i) => (
                       <li key={i} className="flex items-center gap-2 text-sm bg-muted p-2 rounded">
                         <span className="flex-1">{i + 1}. {p}</span>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6"
-                          onClick={() => removePersyaratan(i)}
-                        >
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => removePersyaratan(i)}>
                           <X className="h-3 w-3" />
                         </Button>
                       </li>
@@ -1027,12 +1358,215 @@ export default function TemplateSuratManager() {
               </div>
             </TabsContent>
             
-            <TabsContent value="requirements" className="space-y-4 mt-4">
-              <div>
-                <Label>Persyaratan Pengajuan</Label>
-                <div className="flex gap-2 mt-2">
+            <TabsContent value="requirements" className="space-y-6 mt-4">
+              {/* Dokumen Upload yang Diperlukan */}
+              <div className="p-4 border rounded-lg">
+                <div className="flex items-center gap-2 mb-3">
+                  <Upload className="h-4 w-4 text-blue-500" />
+                  <Label className="text-sm font-semibold">Dokumen Upload yang Diperlukan</Label>
+                </div>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Dokumen yang harus diupload pengguna saat mengajukan surat via WhatsApp
+                </p>
+                
+                <div className="grid grid-cols-4 gap-2 mb-3">
                   <Input
-                    placeholder="Tambah persyaratan..."
+                    placeholder="Key (contoh: ktp)"
+                    value={newDocument.key}
+                    onChange={(e) => setNewDocument({ ...newDocument, key: e.target.value.toLowerCase().replace(/\s/g, '_') })}
+                  />
+                  <Input
+                    placeholder="Label (contoh: KTP)"
+                    value={newDocument.label}
+                    onChange={(e) => setNewDocument({ ...newDocument, label: e.target.value })}
+                  />
+                  <Select
+                    value={newDocument.type}
+                    onValueChange={(v: string) => setNewDocument({ ...newDocument, type: v as RequiredDocument['type'] })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Tipe" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DOCUMENT_TYPES.map(t => (
+                        <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={newDocument.required}
+                      onCheckedChange={(v: boolean) => setNewDocument({ ...newDocument, required: v })}
+                    />
+                    <span className="text-xs">Wajib</span>
+                    <Button type="button" size="sm" onClick={addRequiredDocument}>
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+                
+                {formData.required_documents.length > 0 ? (
+                  <div className="space-y-2">
+                    {formData.required_documents.map((doc, i) => (
+                      <div key={i} className="flex items-center justify-between text-sm bg-blue-50 p-2 rounded border border-blue-200">
+                        <div className="flex items-center gap-3">
+                          <Badge variant="outline" className="text-xs">{doc.key}</Badge>
+                          <span className="font-medium">{doc.label}</span>
+                          <Badge variant="secondary" className="text-xs">
+                            {DOCUMENT_TYPES.find(t => t.value === doc.type)?.label || doc.type}
+                          </Badge>
+                          {doc.required && <Badge className="text-xs bg-red-500">Wajib</Badge>}
+                        </div>
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => removeRequiredDocument(i)}>
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Belum ada dokumen yang diperlukan</p>
+                )}
+              </div>
+
+              {/* Variable Tambahan */}
+              <div className="p-4 border rounded-lg">
+                <div className="flex items-center gap-2 mb-3">
+                  <List className="h-4 w-4 text-purple-500" />
+                  <Label className="text-sm font-semibold">Variable Tambahan</Label>
+                </div>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Data tambahan yang diminta dari pengguna tetapi TIDAK dimasukkan ke dalam surat (hanya untuk keperluan verifikasi/administrasi)
+                </p>
+                
+                <div className="space-y-3 mb-3 p-3 bg-muted/50 rounded-lg">
+                  <div className="grid grid-cols-4 gap-2">
+                    <Input
+                      placeholder="Key (contoh: alamat_tujuan)"
+                      value={newVariable.key}
+                      onChange={(e) => setNewVariable({ ...newVariable, key: e.target.value.toLowerCase().replace(/\s/g, '_') })}
+                    />
+                    <Input
+                      placeholder="Label (contoh: Alamat Tujuan)"
+                      value={newVariable.label}
+                      onChange={(e) => setNewVariable({ ...newVariable, label: e.target.value })}
+                    />
+                    <Select
+                      value={newVariable.type}
+                      onValueChange={(v: string) => setNewVariable({ ...newVariable, type: v as AdditionalVariable['type'] })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Tipe" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {VARIABLE_TYPES.map(t => (
+                          <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={newVariable.required}
+                        onCheckedChange={(v: boolean) => setNewVariable({ ...newVariable, required: v })}
+                      />
+                      <span className="text-xs">Wajib</span>
+                    </div>
+                  </div>
+                  
+                  {newVariable.type === 'select' && (
+                    <div className="pl-2 border-l-2 border-purple-300">
+                      <Label className="text-xs text-muted-foreground mb-2 block">Opsi Pilihan:</Label>
+                      <div className="flex gap-2 mb-2">
+                        <Input
+                          placeholder="Tambah opsi..."
+                          value={newVariableOption}
+                          onChange={(e) => setNewVariableOption(e.target.value)}
+                          onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addVariableOption())}
+                          className="text-sm"
+                        />
+                        <Button type="button" size="sm" variant="outline" onClick={addVariableOption}>
+                          <Plus className="h-3 w-3" />
+                        </Button>
+                      </div>
+                      {(newVariable.options || []).length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {newVariable.options?.map((opt, i) => (
+                            <Badge key={i} variant="secondary" className="text-xs flex items-center gap-1">
+                              {opt}
+                              <X className="h-2 w-2 cursor-pointer" onClick={() => removeVariableOption(i)} />
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  <Button type="button" size="sm" onClick={addAdditionalVariable} className="w-full">
+                    <Plus className="h-4 w-4 mr-2" /> Tambah Variable
+                  </Button>
+                </div>
+                
+                {formData.additional_variables.length > 0 ? (
+                  <div className="space-y-2">
+                    {formData.additional_variables.map((v, i) => (
+                      <div key={i} className="flex items-center justify-between text-sm bg-purple-50 p-2 rounded border border-purple-200">
+                        <div className="flex items-center gap-3 flex-wrap">
+                          <Badge variant="outline" className="text-xs font-mono">{v.key}</Badge>
+                          <span className="font-medium">{v.label}</span>
+                          <Badge variant="secondary" className="text-xs">
+                            {VARIABLE_TYPES.find(t => t.value === v.type)?.label || v.type}
+                          </Badge>
+                          {v.required && <Badge className="text-xs bg-red-500">Wajib</Badge>}
+                          {v.type === 'select' && v.options && v.options.length > 0 && (
+                            <span className="text-xs text-muted-foreground">
+                              Opsi: {v.options.join(', ')}
+                            </span>
+                          )}
+                        </div>
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => removeAdditionalVariable(i)}>
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Belum ada variable tambahan</p>
+                )}
+              </div>
+
+              {/* Keperluan Surat */}
+              <div className="p-4 border rounded-lg bg-purple-50/50">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-purple-600" />
+                    <Label className="text-sm font-semibold">Keperluan Surat</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="requires_keperluan_create" className="text-xs">Aktifkan</Label>
+                    <Switch
+                      id="requires_keperluan_create"
+                      checked={formData.requires_keperluan}
+                      onCheckedChange={(checked: boolean) => setFormData({ ...formData, requires_keperluan: checked })}
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Jika diaktifkan, pengguna akan diminta mengisi keperluan surat saat pengajuan via WhatsApp (contoh: mengurus KIS, beasiswa, keperluan bank, dll)
+                </p>
+              </div>
+
+              {/* Persyaratan Teks (Legacy) */}
+              <div className="p-4 border rounded-lg border-dashed opacity-70">
+                <div className="flex items-center gap-2 mb-3">
+                  <FileText className="h-4 w-4 text-gray-500" />
+                  <Label className="text-sm font-semibold">Persyaratan Teks (Info Tambahan)</Label>
+                </div>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Informasi persyaratan dalam bentuk teks yang ditampilkan kepada pengguna
+                </p>
+                
+                <div className="flex gap-2 mb-3">
+                  <Input
+                    placeholder="Tambah persyaratan teks..."
                     value={newPersyaratan}
                     onChange={(e) => setNewPersyaratan(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addPersyaratan())}
@@ -1043,23 +1577,18 @@ export default function TemplateSuratManager() {
                 </div>
                 
                 {formData.persyaratan.length > 0 ? (
-                  <ul className="mt-3 space-y-2">
+                  <ul className="space-y-2">
                     {formData.persyaratan.map((p, i) => (
                       <li key={i} className="flex items-center gap-2 text-sm bg-muted p-2 rounded">
                         <span className="flex-1">{i + 1}. {p}</span>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6"
-                          onClick={() => removePersyaratan(i)}
-                        >
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => removePersyaratan(i)}>
                           <X className="h-3 w-3" />
                         </Button>
                       </li>
                     ))}
                   </ul>
                 ) : (
-                  <p className="text-sm text-muted-foreground mt-2">Belum ada persyaratan</p>
+                  <p className="text-sm text-muted-foreground">Belum ada persyaratan teks</p>
                 )}
               </div>
             </TabsContent>

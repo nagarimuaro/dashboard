@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useRef } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card"
 import { Button } from "./ui/button"
 import { Input } from "./ui/input"
@@ -16,15 +16,48 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
-  ChevronsRight
+  ChevronsRight,
+  Upload,
+  Download,
+  FileSpreadsheet,
+  CheckCircle,
+  XCircle,
+  AlertCircle,
+  Filter,
+  ChevronDown,
+  ChevronUp,
+  FileText,
+  RotateCcw
 } from "lucide-react"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "./ui/dialog"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./ui/dropdown-menu"
 import { wargaService } from "../services/wargaService.js"
+import { Progress } from "./ui/progress"
 
 interface DataWargaProps {
   userRole: 'admin_global' | 'admin_nagari' | 'staff_nagari' | 'warga'
   onNavigateToDetail?: (wargaId: string | number) => void
 }
+
+interface ImportResult {
+  total: number;
+  success: number;
+  failed: number;
+  skipped: number;
+  keluarga_created: number;
+  errors: Array<{
+    row: number;
+    nik?: string;
+    nama?: string;
+    message: string;
+  }>;
+}
+
+// Filter options
+const AGAMA_OPTIONS = ['Islam', 'Kristen', 'Katolik', 'Hindu', 'Buddha', 'Konghucu', 'Kepercayaan'];
+const PENDIDIKAN_OPTIONS = ['Tidak/Belum Sekolah', 'Tidak Tamat SD', 'Tamat SD/Sederajat', 'SLTP/Sederajat', 'SLTA/Sederajat', 'Diploma I/II', 'Akademi/Diploma III/S.Muda', 'Diploma IV/Strata I', 'Strata II', 'Strata III'];
+const PEKERJAAN_OPTIONS = ['Belum/Tidak Bekerja', 'Mengurus Rumah Tangga', 'Pelajar/Mahasiswa', 'Pensiunan', 'PNS', 'TNI', 'POLRI', 'Petani/Pekebun', 'Nelayan', 'Pedagang', 'Wiraswasta', 'Karyawan Swasta', 'Karyawan BUMN', 'Karyawan BUMD', 'Karyawan Honorer', 'Buruh Harian Lepas', 'Buruh Tani/Perkebunan', 'Pembantu Rumah Tangga', 'Tukang Batu', 'Sopir', 'Guru', 'Dokter', 'Perawat', 'Bidan', 'Lainnya'];
+const SHDK_OPTIONS = ['Kepala Keluarga', 'Istri', 'Anak', 'Menantu', 'Cucu', 'Orang Tua', 'Mertua', 'Famili Lain', 'Pembantu', 'Lainnya'];
 
 export function DataWarga({ userRole, onNavigateToDetail }: DataWargaProps) {
   const [searchTerm, setSearchTerm] = useState("")
@@ -38,6 +71,29 @@ export function DataWarga({ userRole, onNavigateToDetail }: DataWargaProps) {
     total: 0,
     total_pages: 0
   })
+
+  // Advanced filter states
+  const [showAdvancedFilter, setShowAdvancedFilter] = useState(false)
+  const [filterAgama, setFilterAgama] = useState("all")
+  const [filterPendidikan, setFilterPendidikan] = useState("all")
+  const [filterPekerjaan, setFilterPekerjaan] = useState("all")
+  const [filterJorong, setFilterJorong] = useState("all")
+  const [filterRT, setFilterRT] = useState("")
+  const [filterRW, setFilterRW] = useState("")
+  const [filterShdk, setFilterShdk] = useState("all")
+  const [filterUmurMin, setFilterUmurMin] = useState("")
+  const [filterUmurMax, setFilterUmurMax] = useState("")
+  const [exportLoading, setExportLoading] = useState(false)
+  const [exportProgress, setExportProgress] = useState(0)
+  const [jorongOptions, setJorongOptions] = useState<string[]>([])
+  
+  // State for Import Dialog
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
+  const [importFile, setImportFile] = useState<File | null>(null)
+  const [importLoading, setImportLoading] = useState(false)
+  const [importProgress, setImportProgress] = useState(0)
+  const [importResult, setImportResult] = useState<ImportResult | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   
   // State for Add Warga Dialog
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
@@ -66,16 +122,33 @@ export function DataWarga({ userRole, onNavigateToDetail }: DataWargaProps) {
   })
   const [formError, setFormError] = useState('')
 
+  // Build filter parameters
+  const buildFilterParams = () => {
+    const params: any = {}
+    if (searchTerm) params.search = searchTerm
+    if (selectedGender !== 'all') params.jenis_kelamin = selectedGender
+    if (selectedStatus !== 'all') params.status_perkawinan = selectedStatus
+    if (filterAgama !== 'all') params.agama = filterAgama
+    if (filterPendidikan !== 'all') params.pendidikan = filterPendidikan
+    if (filterPekerjaan !== 'all') params.pekerjaan = filterPekerjaan
+    if (filterJorong !== 'all') params.jorong = filterJorong
+    if (filterRT) params.rt = filterRT
+    if (filterRW) params.rw = filterRW
+    if (filterShdk !== 'all') params.shdk = filterShdk
+    if (filterUmurMin) params.umur_min = filterUmurMin
+    if (filterUmurMax) params.umur_max = filterUmurMax
+    return params
+  }
+
   // Load warga data from API
   const loadWargaData = async (params = {}) => {
     try {
       setLoading(true)
+      const filterParams = buildFilterParams()
       const requestParams = {
         page: pagination.page,
         per_page: pagination.per_page,
-        search: searchTerm,
-        gender: selectedGender !== 'all' ? selectedGender : undefined,
-        marital_status: selectedStatus !== 'all' ? selectedStatus : undefined,
+        ...filterParams,
         ...params
       }
       
@@ -87,6 +160,14 @@ export function DataWarga({ userRole, onNavigateToDetail }: DataWargaProps) {
         const meta = response.meta || {}
         
         setWargaData(wargaList)
+        
+        // Extract unique jorong for filter options
+        if (jorongOptions.length === 0 && wargaList.length > 0) {
+          const uniqueJorong = [...new Set(wargaList.map((w: any) => w.jorong).filter(Boolean))] as string[]
+          if (uniqueJorong.length > 0) {
+            setJorongOptions(uniqueJorong)
+          }
+        }
         
         // Update pagination info from Laravel meta
         setPagination({
@@ -107,10 +188,70 @@ export function DataWarga({ userRole, onNavigateToDetail }: DataWargaProps) {
     }
   }
 
+  // Handle export with filters
+  const handleExport = async (format: 'pdf' | 'csv') => {
+    try {
+      setExportLoading(true)
+      setExportProgress(0)
+      const filterParams = buildFilterParams()
+      
+      const blob = await wargaService.exportWithDownload(filterParams, format, (progress: number) => {
+        if (progress >= 0) {
+          setExportProgress(progress)
+        }
+      })
+      
+      // Set to 100% before download
+      setExportProgress(100)
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `data_warga_${new Date().toISOString().slice(0, 10)}.${format}`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+    } catch (error) {
+      console.error('Export failed:', error)
+      alert('Gagal mengekspor data. Silakan coba lagi.')
+    } finally {
+      // Keep 100% for a moment before hiding
+      setTimeout(() => {
+        setExportLoading(false)
+        setExportProgress(0)
+      }, 500)
+    }
+  }
+
+  // Reset all filters
+  const handleResetFilters = () => {
+    setSearchTerm("")
+    setSelectedGender("all")
+    setSelectedStatus("all")
+    setFilterAgama("all")
+    setFilterPendidikan("all")
+    setFilterPekerjaan("all")
+    setFilterJorong("all")
+    setFilterRT("")
+    setFilterRW("")
+    setFilterShdk("all")
+    setFilterUmurMin("")
+    setFilterUmurMax("")
+    setPagination(prev => ({ ...prev, page: 1 }))
+  }
+
+  // Apply filters
+  const handleApplyFilters = () => {
+    setPagination(prev => ({ ...prev, page: 1 }))
+    loadWargaData({ page: 1 })
+  }
+
   // Load data on component mount and when filters change
   useEffect(() => {
     loadWargaData()
-  }, [pagination.page, selectedGender, selectedStatus])
+  }, [pagination.page, selectedGender, selectedStatus, filterAgama, filterPendidikan, filterPekerjaan, filterJorong, filterRT, filterRW, filterShdk, filterUmurMin, filterUmurMax])
 
   // Handle search with debounce
   useEffect(() => {
@@ -197,6 +338,93 @@ export function DataWarga({ userRole, onNavigateToDetail }: DataWargaProps) {
     }
   }
 
+  // Handle import file select
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      // Validate file type
+      const allowedTypes = [
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // xlsx
+        'application/vnd.ms-excel', // xls
+        'text/csv',
+      ]
+      const allowedExtensions = ['.xlsx', '.xls', '.csv']
+      const fileExtension = file.name.toLowerCase().slice(file.name.lastIndexOf('.'))
+      
+      if (!allowedTypes.includes(file.type) && !allowedExtensions.includes(fileExtension)) {
+        alert('Format file tidak didukung. Gunakan file .xlsx, .xls, atau .csv')
+        return
+      }
+      
+      setImportFile(file)
+      setImportResult(null)
+    }
+  }
+
+  // Handle import
+  const handleImport = async () => {
+    if (!importFile) {
+      alert('Pilih file terlebih dahulu')
+      return
+    }
+
+    try {
+      setImportLoading(true)
+      setImportProgress(0)
+      setImportResult(null)
+
+      // Use progress callback for upload progress
+      const response = await wargaService.bulkImport(importFile, (progress) => {
+        setImportProgress(progress)
+      })
+
+      console.log('Import response:', response)
+
+      if (response.success) {
+        setImportResult(response.data)
+        // Reload data after successful import
+        loadWargaData()
+      } else {
+        alert('Import gagal: ' + (response.message || 'Terjadi kesalahan'))
+      }
+    } catch (error: any) {
+      console.error('Import error:', error)
+      alert('Import gagal: ' + (error.message || 'Terjadi kesalahan'))
+    } finally {
+      setImportLoading(false)
+    }
+  }
+
+  // Handle download template
+  const handleDownloadTemplate = async () => {
+    try {
+      const blob = await wargaService.downloadTemplate()
+      
+      // Create download link from blob
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'template_import_warga.csv'
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+    } catch (error) {
+      console.error('Download template error:', error)
+      alert('Gagal download template')
+    }
+  }
+
+  // Reset import dialog
+  const resetImportDialog = () => {
+    setImportFile(null)
+    setImportResult(null)
+    setImportProgress(0)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
+
   // Handle delete warga
   const handleDeleteWarga = async (id: string | number) => {
     if (confirm('Apakah Anda yakin ingin menghapus data warga ini?')) {
@@ -221,414 +449,434 @@ export function DataWarga({ userRole, onNavigateToDetail }: DataWargaProps) {
 
   return (
     <div className="space-y-6">
-      {/* Header with Actions */}
-      <Card>
-        <CardHeader>
-          <div className="flex justify-between items-start">
-            <div>
-              <CardTitle>Data Warga</CardTitle>
-              <CardDescription>Kelola data warga Nagari</CardDescription>
-            </div>
-            {userRole !== 'warga' && (
-              <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button>
-                    <UserPlus className="h-4 w-4 mr-2" />
-                    Tambah Warga
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-h-[90vh] flex flex-col max-w-3xl">
-                  <DialogHeader>
-                    <DialogTitle>Tambah Data Warga Baru</DialogTitle>
-                    <DialogDescription>
-                      Isi form di bawah untuk menambahkan data warga baru
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="overflow-y-auto flex-1 pr-2">
-                    <div className="space-y-4 py-4">
-                      {/* Error message */}
-                      {formError && (
-                        <div className="p-3 bg-red-50 border border-red-200 rounded-md text-red-800 text-sm">
-                          {formError}
-                        </div>
-                      )}
-
-                      {/* Data Pribadi */}
-                      <div className="space-y-3">
-                        <h3 className="font-semibold text-sm border-b pb-2">Data Pribadi</h3>
-                        
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="nik">NIK *</Label>
-                            <Input 
-                              id="nik" 
-                              placeholder="16 digit NIK" 
-                              value={formData.nik}
-                              onChange={(e) => setFormData({...formData, nik: e.target.value})}
-                              maxLength={16}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="no_kk">No. KK</Label>
-                            <Input 
-                              id="no_kk" 
-                              placeholder="16 digit No. KK" 
-                              value={formData.no_kk}
-                              onChange={(e) => setFormData({...formData, no_kk: e.target.value})}
-                              maxLength={16}
-                            />
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="nama">Nama Lengkap *</Label>
-                          <Input 
-                            id="nama" 
-                            placeholder="Nama lengkap sesuai KTP" 
-                            value={formData.nama}
-                            onChange={(e) => setFormData({...formData, nama: e.target.value})}
-                          />
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="nama_ayah">Nama Ayah</Label>
-                            <Input 
-                              id="nama_ayah" 
-                              placeholder="Nama ayah kandung" 
-                              value={formData.nama_ayah}
-                              onChange={(e) => setFormData({...formData, nama_ayah: e.target.value})}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="nama_ibu">Nama Ibu</Label>
-                            <Input 
-                              id="nama_ibu" 
-                              placeholder="Nama ibu kandung" 
-                              value={formData.nama_ibu}
-                              onChange={(e) => setFormData({...formData, nama_ibu: e.target.value})}
-                            />
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="tempat_lahir">Tempat Lahir</Label>
-                            <Input 
-                              id="tempat_lahir" 
-                              placeholder="Kota kelahiran" 
-                              value={formData.tempat_lahir}
-                              onChange={(e) => setFormData({...formData, tempat_lahir: e.target.value})}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="tanggal_lahir">Tanggal Lahir</Label>
-                            <Input 
-                              id="tanggal_lahir" 
-                              type="date" 
-                              value={formData.tanggal_lahir}
-                              onChange={(e) => setFormData({...formData, tanggal_lahir: e.target.value})}
-                            />
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="jenis_kelamin">Jenis Kelamin</Label>
-                            <Select 
-                              value={formData.jenis_kelamin} 
-                              onValueChange={(value: string) => setFormData({...formData, jenis_kelamin: value})}
-                            >
-                              <SelectTrigger>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="L">Laki-laki</SelectItem>
-                                <SelectItem value="P">Perempuan</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="agama">Agama</Label>
-                            <Select 
-                              value={formData.agama} 
-                              onValueChange={(value: string) => setFormData({...formData, agama: value})}
-                            >
-                              <SelectTrigger>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="Islam">Islam</SelectItem>
-                                <SelectItem value="Kristen">Kristen</SelectItem>
-                                <SelectItem value="Katolik">Katolik</SelectItem>
-                                <SelectItem value="Hindu">Hindu</SelectItem>
-                                <SelectItem value="Buddha">Buddha</SelectItem>
-                                <SelectItem value="Konghucu">Konghucu</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="status_perkawinan">Status Perkawinan</Label>
-                          <Select 
-                            value={formData.status_perkawinan} 
-                            onValueChange={(value: string) => setFormData({...formData, status_perkawinan: value})}
-                          >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="Belum Kawin">Belum Kawin</SelectItem>
-                              <SelectItem value="Kawin">Kawin</SelectItem>
-                              <SelectItem value="Cerai Hidup">Cerai Hidup</SelectItem>
-                              <SelectItem value="Cerai Mati">Cerai Mati</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="shdk">Status Hubungan Dalam Keluarga (SHDK)</Label>
-                          <Select 
-                            value={formData.shdk} 
-                            onValueChange={(value: string) => setFormData({...formData, shdk: value})}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Pilih SHDK" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="Kepala Keluarga">Kepala Keluarga</SelectItem>
-                              <SelectItem value="Suami">Suami</SelectItem>
-                              <SelectItem value="Istri">Istri</SelectItem>
-                              <SelectItem value="Anak">Anak</SelectItem>
-                              <SelectItem value="Menantu">Menantu</SelectItem>
-                              <SelectItem value="Cucu">Cucu</SelectItem>
-                              <SelectItem value="Orang Tua">Orang Tua</SelectItem>
-                              <SelectItem value="Mertua">Mertua</SelectItem>
-                              <SelectItem value="Famili Lain">Famili Lain</SelectItem>
-                              <SelectItem value="Pembantu">Pembantu</SelectItem>
-                              <SelectItem value="Lainnya">Lainnya</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-
-                      {/* Pendidikan & Pekerjaan */}
-                      <div className="space-y-3">
-                        <h3 className="font-semibold text-sm border-b pb-2">Pendidikan & Pekerjaan</h3>
-                        
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="pendidikan">Pendidikan Terakhir</Label>
-                            <Select 
-                              value={formData.pendidikan} 
-                              onValueChange={(value: string) => setFormData({...formData, pendidikan: value})}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Pilih pendidikan" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="Tidak/Belum Sekolah">Tidak/Belum Sekolah</SelectItem>
-                                <SelectItem value="Belum Tamat SD/Sederajat">Belum Tamat SD/Sederajat</SelectItem>
-                                <SelectItem value="Tamat SD/Sederajat">Tamat SD/Sederajat</SelectItem>
-                                <SelectItem value="SLTP/Sederajat">SLTP/Sederajat</SelectItem>
-                                <SelectItem value="SLTA/Sederajat">SLTA/Sederajat</SelectItem>
-                                <SelectItem value="Diploma I/II">Diploma I/II</SelectItem>
-                                <SelectItem value="Diploma III">Diploma III</SelectItem>
-                                <SelectItem value="Diploma IV/Strata I">Diploma IV/Strata I</SelectItem>
-                                <SelectItem value="Strata II">Strata II</SelectItem>
-                                <SelectItem value="Strata III">Strata III</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="pekerjaan">Pekerjaan</Label>
-                            <Input 
-                              id="pekerjaan" 
-                              placeholder="Pekerjaan utama" 
-                              value={formData.pekerjaan}
-                              onChange={(e) => setFormData({...formData, pekerjaan: e.target.value})}
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Alamat */}
-                      <div className="space-y-3">
-                        <h3 className="font-semibold text-sm border-b pb-2">Alamat</h3>
-                        
-                        <div className="space-y-2">
-                          <Label htmlFor="alamat">Alamat Lengkap</Label>
-                          <Input 
-                            id="alamat" 
-                            placeholder="Jalan, nomor rumah, dll" 
-                            value={formData.alamat}
-                            onChange={(e) => setFormData({...formData, alamat: e.target.value})}
-                          />
-                        </div>
-
-                        <div className="grid grid-cols-3 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="rt">RT</Label>
-                            <Input 
-                              id="rt" 
-                              placeholder="RT" 
-                              value={formData.rt}
-                              onChange={(e) => setFormData({...formData, rt: e.target.value})}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="rw">RW</Label>
-                            <Input 
-                              id="rw" 
-                              placeholder="RW" 
-                              value={formData.rw}
-                              onChange={(e) => setFormData({...formData, rw: e.target.value})}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="jorong">Jorong/Dusun</Label>
-                            <Input 
-                              id="jorong" 
-                              placeholder="Jorong/Dusun" 
-                              value={formData.jorong}
-                              onChange={(e) => setFormData({...formData, jorong: e.target.value})}
-                            />
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="kecamatan">Kecamatan</Label>
-                          <Input 
-                            id="kecamatan" 
-                            placeholder="Nama kecamatan" 
-                            value={formData.kecamatan}
-                            onChange={(e) => setFormData({...formData, kecamatan: e.target.value})}
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="status_domisili">Status Domisili</Label>
-                          <Select 
-                            value={formData.status_domisili} 
-                            onValueChange={(value: string) => setFormData({...formData, status_domisili: value})}
-                          >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="Tetap">Tetap</SelectItem>
-                              <SelectItem value="Sementara">Sementara</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-
-                      {/* Kontak */}
-                      <div className="space-y-3">
-                        <h3 className="font-semibold text-sm border-b pb-2">Kontak</h3>
-                        
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="no_hp">No. HP/WA</Label>
-                            <Input 
-                              id="no_hp" 
-                              placeholder="08xxxxxxxxxx" 
-                              value={formData.no_hp}
-                              onChange={(e) => setFormData({...formData, no_hp: e.target.value})}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="email">Email</Label>
-                            <Input 
-                              id="email" 
-                              type="email" 
-                              placeholder="email@example.com" 
-                              value={formData.email}
-                              onChange={(e) => setFormData({...formData, email: e.target.value})}
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex gap-2 pt-4">
-                        <Button className="flex-1" onClick={handleAddWarga}>
-                          <Plus className="h-4 w-4 mr-2" />
-                          Simpan Data Warga
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          onClick={() => {
-                            setIsAddDialogOpen(false)
-                            setFormError('')
-                          }}
-                        >
-                          Batal
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </DialogContent>
-              </Dialog>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="flex gap-4 items-end">
-            <div className="flex-1">
-              <Label htmlFor="search">Pencarian</Label>
-              <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="search"
-                  placeholder="Cari berdasarkan nama atau NIK..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
+      {/* Export Progress Dialog */}
+      {exportLoading && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <Card className="w-80 p-6">
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                <span className="font-medium">
+                  {exportProgress === 100 ? 'Download selesai!' : 'Mengekspor data...'}
+                </span>
               </div>
+              <Progress value={exportProgress} className="h-2" />
+              <p className="text-sm text-muted-foreground text-center">
+                {exportProgress}%
+              </p>
             </div>
-            <div className="space-y-2">
-              <Label>Filter Gender</Label>
-              <Select value={selectedGender} onValueChange={setSelectedGender}>
-                <SelectTrigger className="w-40">
-                  <SelectValue placeholder="Gender" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Semua Gender</SelectItem>
-                  <SelectItem value="L">Laki-laki</SelectItem>
-                  <SelectItem value="P">Perempuan</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Filter Status</Label>
-              <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                <SelectTrigger className="w-40">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Semua Status</SelectItem>
-                  <SelectItem value="Belum Kawin">Belum Kawin</SelectItem>
-                  <SelectItem value="Kawin">Kawin</SelectItem>
-                  <SelectItem value="Cerai Hidup">Cerai Hidup</SelectItem>
-                  <SelectItem value="Cerai Mati">Cerai Mati</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </Card>
+        </div>
+      )}
 
       {/* Data Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Daftar Warga</CardTitle>
-          <CardDescription>
-            {loading ? 'Memuat data...' : `Menampilkan ${wargaData.length} warga`}
-          </CardDescription>
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <CardTitle>Data Warga</CardTitle>
+              <CardDescription>
+                {loading ? 'Memuat data...' : `Menampilkan ${wargaData.length} dari ${pagination.total} warga`}
+              </CardDescription>
+            </div>
+            <div className="flex gap-2 items-center flex-wrap">
+              <div className="relative flex items-center h-9 px-3 border border-input bg-background rounded-md hover:bg-accent hover:text-accent-foreground">
+                <Search className="h-4 w-4 text-muted-foreground mr-2" />
+                <Input
+                  placeholder="Cari nama atau NIK..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="border-0 p-0 h-auto w-[150px] focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent"
+                />
+              </div>
+              <Button 
+                variant="outline" 
+                onClick={() => setShowAdvancedFilter(!showAdvancedFilter)}
+                className="gap-2"
+              >
+                <Filter className="h-4 w-4" />
+                Filter
+                {showAdvancedFilter ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              </Button>
+              {userRole !== 'warga' && (
+                <>
+                  {/* Export Button with Dropdown */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" disabled={exportLoading}>
+                        {exportLoading ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Download className="h-4 w-4 mr-2" />
+                        )}
+                        Export
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => handleExport('pdf')}>
+                        <FileText className="h-4 w-4 mr-2 text-red-600" />
+                        PDF
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleExport('csv')}>
+                        <FileSpreadsheet className="h-4 w-4 mr-2 text-green-600" />
+                        CSV
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+
+                  {/* Import Button */}
+                  <Dialog open={isImportDialogOpen} onOpenChange={(open: boolean) => {
+                    setIsImportDialogOpen(open)
+                    if (!open) resetImportDialog()
+                  }}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline">
+                        <Upload className="h-4 w-4 mr-2" />
+                        Import
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-2xl">
+                      <DialogHeader>
+                        <DialogTitle>Import Data Warga</DialogTitle>
+                        <DialogDescription>
+                          Upload file Excel (.xlsx) atau CSV untuk import data warga secara massal.
+                          Data keluarga akan otomatis dibuat berdasarkan No. KK.
+                        </DialogDescription>
+                      </DialogHeader>
+                      
+                      <div className="space-y-4 py-4">
+                        {/* Download Template */}
+                        <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg border border-blue-200">
+                          <div className="flex items-center gap-3">
+                            <FileSpreadsheet className="h-8 w-8 text-blue-600" />
+                            <div>
+                              <p className="font-medium text-blue-900">Template Import</p>
+                              <p className="text-sm text-blue-700">Download template untuk format data yang benar</p>
+                            </div>
+                          </div>
+                          <Button variant="outline" size="sm" onClick={handleDownloadTemplate}>
+                            <Download className="h-4 w-4 mr-2" />
+                            Download
+                          </Button>
+                        </div>
+
+                        {/* File Upload */}
+                        <div className="space-y-2">
+                          <Label>Pilih File</Label>
+                          <div className="flex gap-2">
+                            <Input
+                              ref={fileInputRef}
+                              type="file"
+                              accept=".xlsx,.xls,.csv"
+                              onChange={handleFileSelect}
+                              disabled={importLoading}
+                            />
+                          </div>
+                          {importFile && (
+                            <p className="text-sm text-muted-foreground">
+                              File: {importFile.name} ({(importFile.size / 1024 / 1024).toFixed(2)} MB)
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Progress */}
+                        {importLoading && (
+                          <div className="space-y-3 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                                <span className="text-sm font-medium text-blue-900">
+                                  {importProgress < 100 ? 'Mengupload file...' : 'Memproses data...'}
+                                </span>
+                              </div>
+                              <span className="text-sm font-bold text-blue-700">{importProgress}%</span>
+                            </div>
+                            <Progress value={importProgress} className="h-3" />
+                            <p className="text-xs text-blue-600">
+                              {importProgress < 100 
+                                ? 'Mohon tunggu, jangan tutup halaman ini...' 
+                                : 'Upload selesai, sedang memproses data di server...'}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Import Result */}
+                        {importResult && (
+                          <div className="space-y-3 p-4 bg-gray-50 rounded-lg">
+                            <h4 className="font-semibold">Hasil Import</h4>
+                            
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm text-muted-foreground">Total Data:</span>
+                                <Badge variant="secondary">{importResult.total}</Badge>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <CheckCircle className="h-4 w-4 text-green-600" />
+                                <span className="text-sm">Berhasil: {importResult.success}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <AlertCircle className="h-4 w-4 text-yellow-600" />
+                                <span className="text-sm">Dilewati: {importResult.skipped}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <XCircle className="h-4 w-4 text-red-600" />
+                                <span className="text-sm">Gagal: {importResult.failed}</span>
+                              </div>
+                            </div>
+
+                            {importResult.keluarga_created > 0 && (
+                              <div className="flex items-center gap-2 pt-2 border-t">
+                                <span className="text-sm text-green-700">
+                                  ✓ {importResult.keluarga_created} Kartu Keluarga baru dibuat
+                                </span>
+                              </div>
+                            )}
+
+                            {/* Error Details */}
+                            {importResult.errors && importResult.errors.length > 0 && (
+                              <div className="mt-3">
+                                <p className="text-sm font-medium text-red-700 mb-2">
+                                  Detail Error ({importResult.errors.length} baris):
+                                </p>
+                                <div className="max-h-40 overflow-y-auto space-y-1">
+                                  {importResult.errors.slice(0, 20).map((err, idx) => (
+                                    <div key={idx} className="text-xs p-2 bg-red-50 rounded">
+                                      <span className="font-medium">Baris {err.row}:</span>{' '}
+                                      {err.nama && <span>{err.nama} - </span>}
+                                      {err.message}
+                                    </div>
+                                  ))}
+                                  {importResult.errors.length > 20 && (
+                                    <p className="text-xs text-muted-foreground">
+                                      ...dan {importResult.errors.length - 20} error lainnya
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsImportDialogOpen(false)}>
+                          {importResult ? 'Tutup' : 'Batal'}
+                        </Button>
+                        {!importResult && (
+                          <Button onClick={handleImport} disabled={!importFile || importLoading}>
+                            {importLoading ? (
+                              <>
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                Mengimport...
+                              </>
+                            ) : (
+                              <>
+                                <Upload className="h-4 w-4 mr-2" />
+                                Import Data
+                              </>
+                            )}
+                          </Button>
+                        )}
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+
+                  {/* Add Warga Button */}
+                  <Button 
+                    onClick={() => window.location.href = '/kependudukan/data-warga/add'}
+                    style={{ backgroundColor: '#2563eb', color: 'white' }}
+                    className="hover:bg-blue-700"
+                  >
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    Tambah Warga
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
+          {/* Advanced Filter Panel */}
+          {showAdvancedFilter && (
+            <div className="mb-4 p-4 border rounded-lg bg-muted/30 space-y-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                {/* Jenis Kelamin */}
+                <div className="space-y-2">
+                  <Label>Jenis Kelamin</Label>
+                  <Select value={selectedGender} onValueChange={setSelectedGender}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Pilih" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Semua</SelectItem>
+                      <SelectItem value="L">Laki-laki</SelectItem>
+                      <SelectItem value="P">Perempuan</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Status Perkawinan */}
+                <div className="space-y-2">
+                  <Label>Status Perkawinan</Label>
+                  <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Pilih" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Semua</SelectItem>
+                      <SelectItem value="Belum Kawin">Belum Kawin</SelectItem>
+                      <SelectItem value="Kawin">Kawin</SelectItem>
+                      <SelectItem value="Cerai Hidup">Cerai Hidup</SelectItem>
+                      <SelectItem value="Cerai Mati">Cerai Mati</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Agama */}
+                <div className="space-y-2">
+                  <Label>Agama</Label>
+                  <Select value={filterAgama} onValueChange={setFilterAgama}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Pilih Agama" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Semua</SelectItem>
+                      {AGAMA_OPTIONS.map(agama => (
+                        <SelectItem key={agama} value={agama}>{agama}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Pendidikan */}
+                <div className="space-y-2">
+                  <Label>Pendidikan</Label>
+                  <Select value={filterPendidikan} onValueChange={setFilterPendidikan}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Pilih Pendidikan" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Semua</SelectItem>
+                      {PENDIDIKAN_OPTIONS.map(pend => (
+                        <SelectItem key={pend} value={pend}>{pend}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Pekerjaan */}
+                <div className="space-y-2">
+                  <Label>Pekerjaan</Label>
+                  <Select value={filterPekerjaan} onValueChange={setFilterPekerjaan}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Pilih Pekerjaan" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Semua</SelectItem>
+                      {PEKERJAAN_OPTIONS.map(pek => (
+                        <SelectItem key={pek} value={pek}>{pek}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* SHDK */}
+                <div className="space-y-2">
+                  <Label>SHDK</Label>
+                  <Select value={filterShdk} onValueChange={setFilterShdk}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Pilih SHDK" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Semua</SelectItem>
+                      {SHDK_OPTIONS.map(shdk => (
+                        <SelectItem key={shdk} value={shdk}>{shdk}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Jorong */}
+                <div className="space-y-2">
+                  <Label>Jorong</Label>
+                  <Select value={filterJorong} onValueChange={setFilterJorong}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Pilih Jorong" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Semua</SelectItem>
+                      {jorongOptions.map(jorong => (
+                        <SelectItem key={jorong} value={jorong}>{jorong}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* RT */}
+                <div className="space-y-2">
+                  <Label>RT</Label>
+                  <Input 
+                    placeholder="RT" 
+                    value={filterRT} 
+                    onChange={(e) => setFilterRT(e.target.value)}
+                    type="number"
+                    min="1"
+                  />
+                </div>
+
+                {/* RW */}
+                <div className="space-y-2">
+                  <Label>RW</Label>
+                  <Input 
+                    placeholder="RW" 
+                    value={filterRW} 
+                    onChange={(e) => setFilterRW(e.target.value)}
+                    type="number"
+                    min="1"
+                  />
+                </div>
+
+                {/* Umur Min */}
+                <div className="space-y-2">
+                  <Label>Umur Min</Label>
+                  <Input 
+                    placeholder="Min" 
+                    value={filterUmurMin} 
+                    onChange={(e) => setFilterUmurMin(e.target.value)}
+                    type="number"
+                    min="0"
+                    max="150"
+                  />
+                </div>
+
+                {/* Umur Max */}
+                <div className="space-y-2">
+                  <Label>Umur Max</Label>
+                  <Input 
+                    placeholder="Max" 
+                    value={filterUmurMax} 
+                    onChange={(e) => setFilterUmurMax(e.target.value)}
+                    type="number"
+                    min="0"
+                    max="150"
+                  />
+                </div>
+              </div>
+
+              {/* Filter Action Buttons */}
+              <div className="flex gap-2 justify-end pt-2 border-t">
+                <Button variant="outline" onClick={handleResetFilters} className="gap-2">
+                  <RotateCcw className="h-4 w-4" />
+                  Reset Filter
+                </Button>
+                <Button onClick={handleApplyFilters} className="gap-2">
+                  <Filter className="h-4 w-4" />
+                  Terapkan Filter
+                </Button>
+              </div>
+            </div>
+          )}
+
           {loading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-8 w-8 animate-spin" />

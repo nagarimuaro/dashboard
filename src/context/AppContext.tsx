@@ -10,6 +10,8 @@ interface User {
   role: 'admin_global' | 'admin_nagari' | 'staff_nagari' | 'warga';
   nagari: string;
   foto?: string;
+  permissions?: string[]; // User permissions list
+  permissions_list?: string[]; // Alternative key from API
 }
 
 interface Tenant {
@@ -53,6 +55,10 @@ interface AppContextType {
   refreshNotifications: () => Promise<void>;
   markNotificationAsRead: (id: number) => Promise<void>;
   
+  // Permission helper
+  hasPermission: (permissionKey: string) => boolean;
+  getUserPermissions: () => string[];
+  
   // State setters
   setUser: (user: User | null) => void;
   setTenant: (tenant: Tenant | null) => void;
@@ -79,6 +85,8 @@ export const useApp = (): AppContextType => {
       refreshDashboard: async () => {},
       refreshNotifications: async () => {},
       markNotificationAsRead: async () => {},
+      hasPermission: () => false,
+      getUserPermissions: () => [],
       setUser: () => {},
       setTenant: () => {},
     };
@@ -270,6 +278,33 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     }
   }, []);
 
+  // Permission helper functions
+  const getUserPermissions = useCallback((): string[] => {
+    if (!user) return [];
+    return user.permissions_list || user.permissions || [];
+  }, [user]);
+
+  const hasPermission = useCallback((permissionKey: string): boolean => {
+    if (!user) return false;
+    
+    // Admin global has all permissions
+    if (user.role === 'admin_global') return true;
+    
+    const permissions = getUserPermissions();
+    
+    // If no permissions set, fall back to role-based defaults
+    if (permissions.length === 0) {
+      const roleDefaults: Record<string, string[]> = {
+        'admin_nagari': ['dashboard', 'data_warga', 'data_keluarga', 'surat', 'kelola_permohonan', 'template', 'cms', 'keuangan', 'gis', 'data_sosial', 'kader', 'pengaduan', 'arsip', 'user_management', 'settings'],
+        'staff_nagari': ['dashboard', 'data_warga', 'data_keluarga', 'surat', 'kelola_permohonan'],
+        'warga': ['dashboard', 'surat', 'pengaduan']
+      };
+      return roleDefaults[user.role]?.includes(permissionKey) || false;
+    }
+    
+    return permissions.includes(permissionKey);
+  }, [user, getUserPermissions]);
+
   // Load dashboard data when user is authenticated
   useEffect(() => {
     if (user && initialized) {
@@ -295,6 +330,8 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     refreshDashboard,
     refreshNotifications,
     markNotificationAsRead,
+    hasPermission,
+    getUserPermissions,
     setUser,
     setTenant,
   };

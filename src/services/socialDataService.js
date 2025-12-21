@@ -13,11 +13,19 @@ const ENDPOINTS = {
   POPULATION_STATS: '/social-data/population-stats',
   KEMISKINAN: '/social-data/kemiskinan',
   STUNTING: '/social-data/stunting',
+  BALITA: '/wargas/balita', // New: Balita from warga data
+  BALITA_STATISTICS: '/wargas/balita/statistics',
   KB: '/social-data/kb',
   DISABILITAS: '/social-data/disabilitas',
   RTLH: '/social-data/rtlh',
   PUTUS_SEKOLAH: '/social-data/putus-sekolah',
   JORONGS: '/social-data/jorongs',
+  // Export endpoints
+  EXPORT: '/social-data/export',
+  EXPORT_PDF: '/social-data/export-pdf',
+  EXPORT_TYPES: '/social-data/export-types',
+  TEMPLATE: '/social-data/template',
+  IMPORT: '/social-data/import',
   // WHO LMS Growth Analysis endpoints
   STUNTING_DASHBOARD: '/stunting/dashboard',
   STUNTING_BATCH_ANALYZE: '/stunting/batch-analyze',
@@ -129,7 +137,7 @@ class SocialDataService {
   }
 
   // =====================
-  // STUNTING
+  // STUNTING (Legacy - untuk kompatibilitas)
   // =====================
 
   async getStunting(params = {}) {
@@ -155,6 +163,39 @@ class SocialDataService {
   async deleteStunting(id) {
     const response = await apiClient.delete(`${ENDPOINTS.STUNTING}/${id}`);
     return response;
+  }
+
+  // =====================
+  // BALITA (Children 0-59 months from Warga data)
+  // =====================
+
+  /**
+   * Get list of balita (children 0-59 months) from warga data
+   * @param {Object} params - Query parameters (jenis_kelamin, jorong, search, per_page, page, usia_min, usia_max)
+   * @returns {Promise<Object>} Paginated balita data
+   */
+  async getBalita(params = {}) {
+    const response = await apiClient.get(ENDPOINTS.BALITA, params);
+    return response.data;
+  }
+
+  /**
+   * Get balita statistics
+   * @returns {Promise<Object>} Statistics: total, by_gender, by_age_group, by_jorong
+   */
+  async getBalitaStatistics() {
+    const response = await apiClient.get(ENDPOINTS.BALITA_STATISTICS);
+    return response.data;
+  }
+
+  /**
+   * Get balita by ID (warga_id)
+   * @param {number} id - Warga ID
+   * @returns {Promise<Object>} Balita data
+   */
+  async getBalitaById(id) {
+    const response = await apiClient.get(`${ENDPOINTS.BALITA}/${id}`);
+    return response.data;
   }
 
   // =====================
@@ -266,6 +307,27 @@ class SocialDataService {
   async updateKb(id, data) {
     const response = await apiClient.put(`${ENDPOINTS.KB}/${id}`, data);
     return response.data;
+  }
+
+  /**
+   * Update or create KB data by warga_id
+   * @param {number} wargaId - Warga ID
+   * @param {Object} data - KB data to upsert
+   * @returns {Promise<Object>} Updated/created KB data
+   */
+  async upsertKbByWarga(wargaId, data) {
+    const response = await apiClient.put(`${ENDPOINTS.KB}/warga/${wargaId}`, data);
+    return response.data;
+  }
+
+  /**
+   * Delete/deactivate KB data by warga_id
+   * @param {number} wargaId - Warga ID
+   * @returns {Promise<Object>} Delete result
+   */
+  async deleteKbByWarga(wargaId) {
+    const response = await apiClient.delete(`${ENDPOINTS.KB}/warga/${wargaId}`);
+    return response;
   }
 
   async deleteKb(id) {
@@ -402,7 +464,8 @@ class SocialDataService {
   async getByType(type, params = {}) {
     const typeMapping = {
       'kemiskinan': this.getKemiskinan.bind(this),
-      'stunting': this.getStunting.bind(this),
+      'stunting': this.getBalita.bind(this), // Changed: use Balita endpoint for stunting/balita type
+      'balita': this.getBalita.bind(this), // Alias
       'kb': this.getKb.bind(this),
       'disabilitas': this.getDisabilitas.bind(this),
       'rtlh': this.getRtlh.bind(this),
@@ -499,7 +562,8 @@ class SocialDataService {
   async getByIdAndType(type, id) {
     const typeMapping = {
       'kemiskinan': this.getKemiskinanById.bind(this),
-      'stunting': this.getStuntingById.bind(this),
+      'stunting': this.getBalitaById.bind(this), // Changed: use Balita endpoint (data from warga table)
+      'balita': this.getBalitaById.bind(this), // Alias for balita
       'kb': this.getKbById.bind(this),
       'disabilitas': this.getDisabilitasById.bind(this),
       'rtlh': this.getRtlhById.bind(this),
@@ -534,6 +598,104 @@ class SocialDataService {
       console.error('Failed to get growth history:', error);
       return { data: [] };
     }
+  }
+
+  // =====================
+  // EXPORT/IMPORT
+  // =====================
+
+  /**
+   * Get available export types
+   * @returns {Promise<Object>} Available types
+   */
+  async getExportTypes() {
+    const response = await apiClient.get(ENDPOINTS.EXPORT_TYPES);
+    return response.data;
+  }
+
+  /**
+   * Export data to Excel with download
+   * @param {string} type - Data type
+   * @param {Object} params - Filter parameters
+   * @param {function} onProgress - Progress callback
+   * @returns {Promise<Blob>} Excel file blob
+   */
+  async exportToExcel(type, params = {}, onProgress) {
+    const url = `${ENDPOINTS.EXPORT}/${type}`;
+    if (onProgress) {
+      return apiClient.downloadBlobWithProgress(url, params, onProgress);
+    }
+    return apiClient.downloadBlob(url, params);
+  }
+
+  /**
+   * Export data to PDF with download
+   * @param {string} type - Data type (kemiskinan, stunting, kb, disabilitas, rtlh, putus-sekolah)
+   * @param {Object} params - Filter parameters (status, jorong, tahun, search)
+   * @param {function} onProgress - Progress callback
+   * @returns {Promise<Blob>} PDF file blob
+   */
+  async exportToPdf(type, params = {}, onProgress) {
+    const url = `${ENDPOINTS.EXPORT_PDF}/${type}`;
+    if (onProgress) {
+      return apiClient.downloadBlobWithProgress(url, params, onProgress);
+    }
+    return apiClient.downloadBlob(url, params);
+  }
+
+  /**
+   * Download import template
+   * @param {string} type - Data type
+   * @returns {Promise<Blob>} Template file blob
+   */
+  async downloadTemplate(type) {
+    const url = `${ENDPOINTS.TEMPLATE}/${type}`;
+    return apiClient.downloadBlob(url);
+  }
+
+  /**
+   * Validate import file
+   * @param {string} type - Data type
+   * @param {File} file - Excel file
+   * @returns {Promise<Object>} Validation result
+   */
+  async validateImport(type, file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await apiClient.post(`${ENDPOINTS.IMPORT}/${type}/validate`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    return response.data;
+  }
+
+  /**
+   * Preview import data (dry run)
+   * @param {string} type - Data type
+   * @param {File} file - Excel file
+   * @returns {Promise<Object>} Preview result
+   */
+  async previewImport(type, file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await apiClient.post(`${ENDPOINTS.IMPORT}/${type}/preview`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    return response.data;
+  }
+
+  /**
+   * Execute import
+   * @param {string} type - Data type
+   * @param {File} file - Excel file
+   * @returns {Promise<Object>} Import result
+   */
+  async executeImport(type, file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await apiClient.post(`${ENDPOINTS.IMPORT}/${type}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    return response.data;
   }
 }
 

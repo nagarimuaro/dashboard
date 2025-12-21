@@ -12,7 +12,7 @@ import { KeluargaDetailPage } from './pages/KeluargaDetailPage'
 import { WargaTestPage } from './pages/WargaTestPage'
 import { PermohonanSuratPage, KelolaPermohonanPage, GISMapPage, TemplateManagerPage, KeuanganDashboardPage } from './pages/PelayananPages'
 import { LayananSuratPage, PengaduanPage, ArsipSuratPage, UserManagementPage, SettingsPage, ProfilePage } from './pages/SystemPages'
-import { CMSDashboardPage, CMSNewsPage, CMSSettingsPage } from './pages/CMSPages'
+import { CMSDashboardPage, CMSNewsPage, CMSPagesPage, CMSServicesPage, CMSStaffPage, CMSCategoriesPage, CMSSettingsPage } from './pages/CMSPages'
 import { 
   SuratDomisiliPage, SuratPindahPage, SuratKelahiranPage, SuratKematianPage, 
   SuratBelumMenikahPage, SuratNikahPage, SuratJandaDudaPage, SuratPenghasilanPage, 
@@ -23,6 +23,8 @@ import TemplateSuratManager from './pages/TemplateSuratManager'
 import DaftarVariabelSurat from './pages/DaftarVariabelSurat'
 import PermintaanSuratMonitor from './pages/PermintaanSuratMonitor'
 import SuratRequestPage from './pages/SuratRequestPage'
+import SuratRequestDetailPage from './pages/SuratRequestDetailPage'
+import BuatSuratManualPage from './pages/BuatSuratManualPage'
 import { 
   PerizinanIMBPage, PerizinanSITUPage, PerizinanHOPage, 
   PerizinanSIUPPage, PerizinanTrayekPage, PerizinanReklamePage 
@@ -39,27 +41,32 @@ import DataSosialIndexPage from './pages/DataSosialIndexPage'
 import DataKesehatanPage from './pages/DataKesehatanPage'
 import DataKemiskinanPage from './pages/DataKemiskinanPage'
 import StatistikSosialPage from './pages/StatistikSosialPage'
+import { KaderManagementPage, KelompokKaderManagementPage, KaderTugasPage, KaderPerformancePage, KaderKehamilanPage, KaderImunisasiPage, KaderPersalinanPage } from './pages/KaderPages'
+import { JorongPage } from './pages/WilayahPages'
+import { UmkmDirektoriPage, UmkmKategoriPage } from './pages/UmkmPages'
 import { AppProvider } from './context/AppContext'
 import { AuthProvider } from './context/AuthContext'
 import { ProtectedRoute } from './components/ProtectedRoute'
+import { MobileBlocker } from './components/MobileBlocker'
 
 function App() {
   return (
-    <AuthProvider>
-      <AppProvider>
-        <BrowserRouter>
-        <Routes>
-          {/* Auth Routes */}
-          <Route path="/auth" element={<AuthLayout />}>
-            <Route path="login" element={<LoginPage />} />
-            <Route index element={<Navigate to="/auth/login" replace />} />
-          </Route>
+    <MobileBlocker>
+      <AuthProvider>
+        <AppProvider>
+          <BrowserRouter>
+          <Routes>
+            {/* Auth Routes */}
+            <Route path="/auth" element={<AuthLayout />}>
+              <Route path="login" element={<LoginPage />} />
+              <Route index element={<Navigate to="/auth/login" replace />} />
+            </Route>
 
-          {/* Main App Routes */}
-          <Route path="/" element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
-            {/* Dashboard */}
-            <Route index element={<DashboardPage />} />
-            <Route path="dashboard" element={<DashboardPage />} />
+            {/* Main App Routes */}
+            <Route path="/" element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
+              {/* Dashboard */}
+              <Route index element={<DashboardPage />} />
+              <Route path="dashboard" element={<DashboardPage />} />
 
             {/* Kependudukan */}
             <Route path="kependudukan">
@@ -70,6 +77,12 @@ function App() {
               <Route path="data-keluarga" element={<DataKeluargaPage />} />
               <Route path="data-keluarga/:id" element={<KeluargaDetailPage />} />
               <Route path="warga-test" element={<WargaTestPage />} />
+            </Route>
+
+            {/* Wilayah */}
+            <Route path="wilayah">
+              <Route index element={<JorongPage />} />
+              <Route path="jorong" element={<JorongPage />} />
             </Route>
 
             {/* Pelayanan */}
@@ -84,6 +97,8 @@ function App() {
               <Route path="monitor-permintaan" element={<PermintaanSuratMonitor />} />
               <Route path="arsip-surat" element={<ArsipSuratPage />} />
               <Route path="surat-request" element={<SuratRequestPage />} />
+              <Route path="surat-request/buat" element={<BuatSuratManualPage />} />
+              <Route path="surat-request/:id" element={<SuratRequestDetailPage />} />
               
               {/* Layanan Surat dengan kategori - more specific routes */}
               <Route path="layanan/administrasi-umum" element={<LayananSuratPage />} />
@@ -166,6 +181,12 @@ function App() {
               <Route index element={<KeuanganDashboardPage />} />
               <Route path="dashboard" element={<KeuanganDashboardPage />} />
               <Route path="apb" element={<KeuanganDashboardPage />} />
+              <Route path="pendapatan" element={<KeuanganDashboardPage />} />
+              <Route path="belanja" element={<KeuanganDashboardPage />} />
+              <Route path="pembiayaan" element={<KeuanganDashboardPage />} />
+              <Route path="transaksi" element={<KeuanganDashboardPage />} />
+              <Route path="laporan" element={<KeuanganDashboardPage />} />
+              <Route path="aset" element={<KeuanganDashboardPage />} />
               <Route path="realisasi" element={<KeuanganDashboardPage />} />
             </Route>
 
@@ -176,12 +197,35 @@ function App() {
               <Route path="tracking" element={<PengaduanPage />} />
             </Route>
 
-            {/* CMS */}
+            {/* CMS Portal */}
             <Route path="cms">
               <Route index element={<CMSDashboardPage />} />
               <Route path="dashboard" element={<CMSDashboardPage />} />
               <Route path="news" element={<CMSNewsPage />} />
+              <Route path="pages" element={<CMSPagesPage />} />
+              <Route path="services" element={<CMSServicesPage />} />
+              <Route path="staff" element={<CMSStaffPage />} />
+              <Route path="categories" element={<CMSCategoriesPage />} />
               <Route path="settings" element={<CMSSettingsPage />} />
+            </Route>
+
+            {/* Kader Posyandu */}
+            <Route path="kader">
+              <Route index element={<KaderManagementPage />} />
+              <Route path="management" element={<KaderManagementPage />} />
+              <Route path="kelompok" element={<KelompokKaderManagementPage />} />
+              <Route path="tugas" element={<KaderTugasPage />} />
+              <Route path="performa" element={<KaderPerformancePage />} />
+              <Route path="kehamilan" element={<KaderKehamilanPage />} />
+              <Route path="imunisasi" element={<KaderImunisasiPage />} />
+              <Route path="persalinan" element={<KaderPersalinanPage />} />
+            </Route>
+
+            {/* UMKM */}
+            <Route path="umkm">
+              <Route index element={<UmkmDirektoriPage />} />
+              <Route path="direktori" element={<UmkmDirektoriPage />} />
+              <Route path="kategori" element={<UmkmKategoriPage />} />
             </Route>
 
             {/* System */}
@@ -200,9 +244,10 @@ function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>
-      </BrowserRouter>
-      </AppProvider>
-    </AuthProvider>
+        </BrowserRouter>
+        </AppProvider>
+      </AuthProvider>
+    </MobileBlocker>
   )
 }
 

@@ -20,6 +20,7 @@ import { CMSDashboard } from "./components/cms-dashboard"
 import { CMSNews } from "./components/cms-news"
 import { CMSSettings } from "./components/cms-settings"
 import StatistikSosialPage from "./pages/StatistikSosialPage"
+import { KaderManagement, KaderKehamilan, KaderImunisasi, KaderPersalinan, KelompokKaderManagement } from "./components/kader"
 import { Separator } from "./components/ui/separator"
 import { Button } from "./components/ui/button"
 import { Badge } from "./components/ui/badge"
@@ -207,6 +208,18 @@ function AppContent() {
         return <CMSNews userRole={userRole} onModuleChange={setActiveModule} />
       case 'cms-settings':
         return <CMSSettings userRole={userRole} onModuleChange={setActiveModule} />
+      
+      // Kader/Posyandu Modules
+      case 'kader-management':
+        return <KaderManagement userRole={userRole} />
+      case 'kader-kelompok':
+        return <KelompokKaderManagement userRole={userRole} />
+      case 'kader-kehamilan':
+        return <KaderKehamilan userRole={userRole} />
+      case 'kader-imunisasi':
+        return <KaderImunisasi userRole={userRole} />
+      case 'kader-persalinan':
+        return <KaderPersalinan userRole={userRole} />
       
       default:
         return <Dashboard userRole={userRole} onModuleChange={setActiveModule} />

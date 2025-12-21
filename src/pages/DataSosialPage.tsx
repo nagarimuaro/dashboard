@@ -59,6 +59,7 @@ import {
   Accessibility,
   Loader2,
   Eye,
+  Ruler,
 } from "lucide-react";
 import {
   Collapsible,
@@ -224,6 +225,12 @@ export default function DataSosialPage({ type, embedded = false, onViewDetail }:
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [activeChartTab, setActiveChartTab] = useState<"hfa" | "wfa" | "wfh" | "bfa">("hfa");
 
+  // KB Dialog state
+  const [isKbDialogOpen, setIsKbDialogOpen] = useState(false);
+  const [kbEditingItem, setKbEditingItem] = useState<DataSosial | null>(null);
+  const [isKbDeleteDialogOpen, setIsKbDeleteDialogOpen] = useState(false);
+  const [kbDeleteItem, setKbDeleteItem] = useState<DataSosial | null>(null);
+
   // Debounce search
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -381,11 +388,24 @@ export default function DataSosialPage({ type, embedded = false, onViewDetail }:
     );
   }, [filterStatuses, filterJorongs, filterRTs, filterRWs, filterYears, searchQuery]);
 
+  // Helper function to get status value based on type
+  const getItemStatus = (item: DataSosial): string => {
+    if (type === 'kb') {
+      return (item as any).status_kb_display || (item as any).status_kb || item.status || '';
+    }
+    if (type === 'stunting') {
+      // Data balita menggunakan status_stunting dari growth history
+      return (item as any).status_stunting || (item as any).status_hfa || item.status || '';
+    }
+    return item.status || '';
+  };
+
   // Client-side filtering for multi-select (API only supports single filter)
   const filteredData = useMemo(() => {
     return data.filter((item) => {
       // Multi-status filter (client-side if more than 1 selected)
-      if (filterStatuses.length > 1 && !filterStatuses.includes(item.status as string)) {
+      const itemStatus = getItemStatus(item);
+      if (filterStatuses.length > 1 && !filterStatuses.includes(itemStatus)) {
         return false;
       }
 
@@ -411,7 +431,7 @@ export default function DataSosialPage({ type, embedded = false, onViewDetail }:
 
       return true;
     });
-  }, [data, filterStatuses, filterJorongs, filterRTs, filterRWs, filterYears]);
+  }, [data, filterStatuses, filterJorongs, filterRTs, filterRWs, filterYears, type]);
 
   // Statistics calculations
   const statistics = useMemo(() => {
@@ -419,8 +439,9 @@ export default function DataSosialPage({ type, embedded = false, onViewDetail }:
     const statusCounts: Record<string, number> = {};
     config.statusOptions.forEach(s => { statusCounts[s] = 0; });
     filteredData.forEach(item => {
-      if (statusCounts[item.status] !== undefined) {
-        statusCounts[item.status]++;
+      const itemStatus = getItemStatus(item);
+      if (statusCounts[itemStatus] !== undefined) {
+        statusCounts[itemStatus]++;
       }
     });
     const statusDistribution = Object.entries(statusCounts).map(([name, value]) => ({
@@ -591,6 +612,72 @@ export default function DataSosialPage({ type, embedded = false, onViewDetail }:
     setDeleteItem(null);
   };
 
+  // KB-specific handlers
+  const handleDaftarKb = (item: DataSosial) => {
+    setKbEditingItem(item);
+    setFormData({
+      ...item,
+      metode_kb: '',
+      tanggal_mulai_kb: new Date().toISOString().split('T')[0],
+    });
+    setIsKbDialogOpen(true);
+  };
+
+  const handleEditKb = (item: DataSosial) => {
+    setKbEditingItem(item);
+    setFormData(item);
+    setIsKbDialogOpen(true);
+  };
+
+  const handleHapusKb = (item: DataSosial) => {
+    setKbDeleteItem(item);
+    setIsKbDeleteDialogOpen(true);
+  };
+
+  const handleSaveKb = async () => {
+    if (!kbEditingItem) return;
+    setSaving(true);
+    try {
+      // Use warga_id (which is the `id` from getWusList) for upsert
+      const wargaId = kbEditingItem.id;
+      await socialDataService.upsertKbByWarga(wargaId, {
+        jenis_kb: formData.jenis_kb || formData.metode_kb,
+        tanggal_mulai_kb: formData.tanggal_mulai_kb,
+        posyandu: formData.posyandu,
+        keterangan: formData.keterangan,
+      });
+      toast.success('Data KB berhasil disimpan');
+      setIsKbDialogOpen(false);
+      setKbEditingItem(null);
+      setFormData({});
+      loadData();
+    } catch (err: any) {
+      console.error('Failed to save KB data:', err);
+      toast.error('Gagal menyimpan data KB: ' + (err.message || 'Unknown error'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleConfirmDeleteKb = async () => {
+    if (!kbDeleteItem) return;
+    setSaving(true);
+    try {
+      // Use warga_id (which is the `id` from getWusList) for delete
+      const wargaId = kbDeleteItem.id;
+      await socialDataService.deleteKbByWarga(wargaId);
+      toast.success('Data KB berhasil dihapus');
+      setIsKbDeleteDialogOpen(false);
+      setKbDeleteItem(null);
+      loadData();
+    } catch (err: any) {
+      console.error('Failed to delete KB data:', err);
+      toast.error('Gagal menghapus data KB: ' + (err.message || 'Unknown error'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   // Handle open analyze dialog (for stunting)
   const handleOpenAnalyze = async (item: DataSosial) => {
     setAnalyzingItem(item);
@@ -605,11 +692,12 @@ export default function DataSosialPage({ type, embedded = false, onViewDetail }:
     setGrowthHistory([]);
     setIsAnalyzeDialogOpen(true);
     
-    // Load growth history if warga_id exists
-    if (item.warga_id) {
+    // Load growth history if warga_id or id exists
+    const wargaIdForHistory = item.warga_id || item.id;
+    if (wargaIdForHistory) {
       setLoadingHistory(true);
       try {
-        const wargaId = Number(item.warga_id);
+        const wargaId = Number(wargaIdForHistory);
         const response = await socialDataService.getChildGrowthHistory(wargaId) as GrowthHistoryResponse;
         if (response.success && response.data) {
           const historyData = Array.isArray(response.data) ? response.data : (response.data as { data: GrowthHistoryItem[] }).data || [];
@@ -634,8 +722,8 @@ export default function DataSosialPage({ type, embedded = false, onViewDetail }:
 
     setAnalyzing(true);
     try {
-      // Use warga_id from stunting data
-      const wargaId = analyzingItem.warga_id;
+      // Use warga_id from stunting data, or id for balita data
+      const wargaId = analyzingItem.warga_id || analyzingItem.id;
       
       if (!wargaId) {
         toast.error("Data anak tidak terhubung dengan data warga. Mohon update data terlebih dahulu.");
@@ -682,18 +770,20 @@ export default function DataSosialPage({ type, embedded = false, onViewDetail }:
 
   // View growth history
   const handleViewGrowthHistory = async (item: DataSosial) => {
-    if (!item.warga_id) {
+    const wargaId = item.warga_id || item.id;
+    if (!wargaId) {
       toast.error("Data tidak terhubung dengan warga");
       return;
     }
     
     try {
-      const wargaIdNum = Number(item.warga_id);
+      const wargaIdNum = Number(wargaId);
       const response = await socialDataService.getChildGrowthStats(wargaIdNum) as GrowthStatsResponse;
       if (response.success && response.data) {
         // You could open a modal or navigate to detail page
         console.log("Growth stats:", response.data);
-        toast.info(`${item.nama_anak} memiliki ${response.data.ringkasan?.jumlah_pengukuran || 0} pengukuran`);
+        const namaAnak = item.nama_anak || item.nama || 'Anak';
+        toast.info(`${namaAnak} memiliki ${response.data.ringkasan?.jumlah_pengukuran || 0} pengukuran`);
       }
     } catch (error) {
       console.error("Error loading growth history:", error);
@@ -1061,6 +1151,12 @@ export default function DataSosialPage({ type, embedded = false, onViewDetail }:
                 {isColumnVisible("status") && (
                   <TableHead className="font-semibold">Status</TableHead>
                 )}
+                {type === "stunting" && (
+                  <>
+                    <TableHead className="font-semibold text-center">Umur</TableHead>
+                    <TableHead className="font-semibold text-center">Terakhir Diukur</TableHead>
+                  </>
+                )}
                 {isColumnVisible("tahun") && (
                   <TableHead className="font-semibold text-center">Tahun</TableHead>
                 )}
@@ -1125,14 +1221,31 @@ export default function DataSosialPage({ type, embedded = false, onViewDetail }:
                     )}
                     {isColumnVisible("status") && (
                       <TableCell>
-                        <span
-                          className={`px-2 py-1 rounded-full text-xs text-white ${getStatusColor(
-                            item.status
-                          )}`}
-                        >
-                          {item.status}
-                        </span>
+                        {(() => {
+                          // Gunakan helper function untuk mendapatkan status yang benar
+                          const displayStatus = getItemStatus(item) || '-';
+                          return (
+                            <span
+                              className={`px-2 py-1 rounded-full text-xs text-white ${getStatusColor(displayStatus)}`}
+                            >
+                              {displayStatus}
+                            </span>
+                          );
+                        })()}
                       </TableCell>
+                    )}
+                    {type === "stunting" && (
+                      <>
+                        <TableCell className="text-center">
+                          {(item as any).usia_format || (item as any).usia_bulan ? `${(item as any).usia_bulan} bln` : '-'}
+                        </TableCell>
+                        <TableCell className="text-center text-sm">
+                          {(item as any).last_measurement_date 
+                            ? new Date((item as any).last_measurement_date).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
+                            : <span className="text-gray-400">Belum diukur</span>
+                          }
+                        </TableCell>
+                      </>
                     )}
                     {isColumnVisible("tahun") && (
                       <TableCell className="text-center">{item.tahun_data}</TableCell>
@@ -1152,34 +1265,65 @@ export default function DataSosialPage({ type, embedded = false, onViewDetail }:
                           >
                             <Eye className="w-4 h-4" />
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleEdit(item)}
-                            className="h-8 w-8 hover:bg-blue-100 hover:text-blue-600"
-                            title="Edit"
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDelete(item)}
-                            className="h-8 w-8 hover:bg-red-100 hover:text-red-600"
-                            title="Hapus"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                          {type === "stunting" && (
+                          {type === "kb" ? (
+                            <>
+                              <Button
+                                size="sm"
+                                onClick={() => (item as any).is_kb ? handleEditKb(item) : handleDaftarKb(item)}
+                                style={{ 
+                                  backgroundColor: (item as any).is_kb ? '#2563eb' : '#db2777', 
+                                  color: 'white' 
+                                }}
+                                className="h-8 px-3 hover:opacity-90 font-medium"
+                                title={(item as any).is_kb ? "Edit Data KB" : "Daftarkan KB"}
+                              >
+                                {(item as any).is_kb ? <Pencil className="w-4 h-4 mr-1" /> : <Plus className="w-4 h-4 mr-1" />}
+                                {(item as any).is_kb ? "Edit KB" : "Daftar KB"}
+                              </Button>
+                              {(item as any).is_kb && (
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleHapusKb(item)}
+                                  style={{ backgroundColor: '#dc2626', color: 'white' }}
+                                  className="h-8 px-2 hover:opacity-90"
+                                  title="Hapus Data KB"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              )}
+                            </>
+                          ) : type === "stunting" ? (
                             <Button
-                              variant="ghost"
-                              size="icon"
+                              size="sm"
                               onClick={() => handleOpenAnalyze(item)}
-                              className="h-8 w-8 hover:bg-green-100 hover:text-green-600"
-                              title="Analisis Pertumbuhan"
+                              className="h-8 px-3 text-white font-medium"
+                              style={{ backgroundColor: '#16a34a' }}
+                              title="Ukur Pertumbuhan"
                             >
-                              <Activity className="w-4 h-4" />
+                              <Ruler className="w-4 h-4 mr-1" />
+                              Ukur
                             </Button>
+                          ) : (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleEdit(item)}
+                                className="h-8 w-8 hover:bg-blue-100 hover:text-blue-600"
+                                title="Edit"
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleDelete(item)}
+                                className="h-8 w-8 hover:bg-red-100 hover:text-red-600"
+                                title="Hapus"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </>
                           )}
                         </div>
                       </TableCell>
@@ -1684,31 +1828,87 @@ export default function DataSosialPage({ type, embedded = false, onViewDetail }:
 
       {/* Growth Analysis Dialog for Stunting */}
       <Dialog open={isAnalyzeDialogOpen} onOpenChange={setIsAnalyzeDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Activity className="w-5 h-5 text-green-600" />
-              Analisis Pertumbuhan Anak (WHO LMS)
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="pb-4 border-b">
+            <DialogTitle className="flex items-center gap-3 text-lg">
+              <div className="p-2 bg-green-100 rounded-lg">
+                <Activity className="w-5 h-5 text-green-600" />
+              </div>
+              Analisis Pertumbuhan Anak (Standar WHO)
             </DialogTitle>
           </DialogHeader>
           
           {analyzingItem && (
-            <div className="space-y-4">
+            <div className="space-y-5 py-4">
               {/* Child Info */}
-              <div className="bg-blue-50 p-4 rounded-lg">
-                <h4 className="font-semibold text-blue-800 mb-2">Informasi Anak</h4>
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div><span className="text-gray-500">Nama:</span> <strong>{analyzingItem.nama_anak}</strong></div>
-                  <div><span className="text-gray-500">NIK:</span> {analyzingItem.nik_anak || '-'}</div>
-                  <div><span className="text-gray-500">Tanggal Lahir:</span> {analyzingItem.tanggal_lahir || '-'}</div>
-                  <div><span className="text-gray-500">Jenis Kelamin:</span> {analyzingItem.jenis_kelamin === 'L' ? 'Laki-laki' : analyzingItem.jenis_kelamin === 'P' ? 'Perempuan' : '-'}</div>
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-xl border border-blue-100">
+                <h4 className="font-semibold text-blue-800 mb-3 flex items-center gap-2">
+                  <Baby className="w-4 h-4" />
+                  Informasi Anak
+                </h4>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                  <div>
+                    <span className="text-gray-500">Nama:</span>
+                    <p className="font-semibold text-gray-800">{analyzingItem.nama_anak || analyzingItem.nama || '-'}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">NIK:</span>
+                    <p className="font-medium text-gray-700">{analyzingItem.nik_anak || analyzingItem.nik || '-'}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Tanggal Lahir:</span>
+                    <p className="font-medium text-gray-700">{analyzingItem.tanggal_lahir || '-'}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Jenis Kelamin:</span>
+                    <p className="font-medium text-gray-700">
+                      {analyzingItem.jenis_kelamin === 'L' ? 'Laki-laki' : 
+                       analyzingItem.jenis_kelamin === 'P' ? 'Perempuan' : '-'}
+                    </p>
+                  </div>
+                  {(analyzingItem as any).usia_bulan !== undefined && (
+                    <div>
+                      <span className="text-gray-500">Usia:</span>
+                      <p className="font-medium text-gray-700">
+                        {(analyzingItem as any).usia_format || `${(analyzingItem as any).usia_bulan} bulan`}
+                      </p>
+                    </div>
+                  )}
+                  {analyzingItem.jorong && (
+                    <div>
+                      <span className="text-gray-500">Jorong:</span>
+                      <p className="font-medium text-gray-700">{analyzingItem.jorong}</p>
+                    </div>
+                  )}
+                  {(analyzingItem as any).status_stunting && (
+                    <div>
+                      <span className="text-gray-500">Status Stunting:</span>
+                      <p className={`font-medium ${
+                        (analyzingItem as any).status_stunting_color === 'green' ? 'text-green-600' :
+                        (analyzingItem as any).status_stunting_color === 'orange' ? 'text-orange-600' :
+                        (analyzingItem as any).status_stunting_color === 'red' ? 'text-red-600' :
+                        'text-gray-600'
+                      }`}>
+                        {(analyzingItem as any).status_stunting}
+                      </p>
+                    </div>
+                  )}
+                  {(analyzingItem as any).last_measurement_date && (
+                    <div>
+                      <span className="text-gray-500">Terakhir Diukur:</span>
+                      <p className="font-medium text-gray-700">{(analyzingItem as any).last_measurement_date}</p>
+                    </div>
+                  )}
                 </div>
               </div>
 
               {/* Input Form */}
-              <div className="border rounded-lg p-4">
-                <h4 className="font-semibold mb-3">Data Pengukuran</h4>
-                <div className="grid grid-cols-2 gap-4">
+              <div className="border rounded-xl p-5 bg-gray-50/50">
+                <h4 className="font-semibold mb-4 flex items-center gap-2">
+                  <Ruler className="w-4 h-4 text-gray-600" />
+                  Data Pengukuran
+                </h4>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="analyze_tanggal">Tanggal Pengukuran *</Label>
                     <Input
@@ -1763,16 +1963,6 @@ export default function DataSosialPage({ type, embedded = false, onViewDetail }:
                       onChange={(e) => setAnalyzeForm({ ...analyzeForm, posyandu: e.target.value })}
                     />
                   </div>
-                </div>
-                <div className="mt-4">
-                  <Button 
-                    onClick={handleAnalyzeGrowth} 
-                    disabled={analyzing || !analyzeForm.tanggal_pengukuran || !analyzeForm.berat_kg || !analyzeForm.tinggi_cm}
-                    className="bg-green-600 hover:bg-green-700"
-                  >
-                    {analyzing && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                    Analisis dengan WHO LMS
-                  </Button>
                 </div>
               </div>
 
@@ -2163,9 +2353,207 @@ export default function DataSosialPage({ type, embedded = false, onViewDetail }:
             </div>
           )}
           
-          <DialogFooter>
+          <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setIsAnalyzeDialogOpen(false)}>
               Tutup
+            </Button>
+            {analyzingItem && (
+              <Button 
+                onClick={handleAnalyzeGrowth} 
+                disabled={analyzing || !analyzeForm.tanggal_pengukuran || !analyzeForm.berat_kg || !analyzeForm.tinggi_cm}
+                className="bg-green-600 hover:bg-green-700 text-white"
+                style={{ backgroundColor: '#16a34a' }}
+              >
+                {analyzing && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                <Ruler className="w-4 h-4 mr-2" />
+                Simpan Pengukuran
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* KB Dialog - Daftar/Edit KB */}
+      <Dialog open={isKbDialogOpen} onOpenChange={setIsKbDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader className="pb-4 border-b">
+            <DialogTitle className="flex items-center gap-3 text-lg">
+              <div className="p-2 bg-pink-100 rounded-lg">
+                <Heart className="w-5 h-5 text-pink-600" />
+              </div>
+              {(kbEditingItem as any)?.is_kb ? 'Edit Data Keluarga Berencana' : 'Pendaftaran Akseptor KB'}
+            </DialogTitle>
+          </DialogHeader>
+          
+          {kbEditingItem && (
+            <div className="space-y-5 py-4">
+              {/* Info WUS */}
+              <div className="bg-gradient-to-r from-pink-50 to-rose-50 p-4 rounded-xl border border-pink-100">
+                <h4 className="text-sm font-semibold text-pink-800 mb-3 flex items-center gap-2">
+                  <Users className="w-4 h-4" />
+                  Informasi Akseptor
+                </h4>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <span className="text-gray-500">Nama:</span>
+                    <p className="font-semibold text-gray-800">{kbEditingItem.nama || (kbEditingItem as any).nama_warga}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">NIK:</span>
+                    <p className="font-medium text-gray-700">{kbEditingItem.nik || '-'}</p>
+                  </div>
+                  {(kbEditingItem as any).usia && (
+                    <div>
+                      <span className="text-gray-500">Usia:</span>
+                      <p className="font-medium text-gray-700">{(kbEditingItem as any).usia} tahun</p>
+                    </div>
+                  )}
+                  {kbEditingItem.jorong && (
+                    <div>
+                      <span className="text-gray-500">Jorong:</span>
+                      <p className="font-medium text-gray-700">{kbEditingItem.jorong}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              {/* Form KB */}
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="metode_kb" className="text-sm font-medium">
+                    Metode/Jenis KB <span className="text-red-500">*</span>
+                  </Label>
+                  <Select
+                    value={(formData as any).metode_kb || (formData as any).jenis_kb || ''}
+                    onValueChange={(value: string) => setFormData({ ...formData, metode_kb: value, jenis_kb: value })}
+                  >
+                    <SelectTrigger className="h-11">
+                      <SelectValue placeholder="Pilih metode KB" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="IUD">💠 IUD (Intra Uterine Device)</SelectItem>
+                      <SelectItem value="Implant">💊 Implant/Susuk</SelectItem>
+                      <SelectItem value="Suntik">💉 Suntik</SelectItem>
+                      <SelectItem value="Pil">💊 Pil</SelectItem>
+                      <SelectItem value="Kondom">🛡️ Kondom</SelectItem>
+                      <SelectItem value="MOW">🏥 MOW (Tubektomi)</SelectItem>
+                      <SelectItem value="MOP">🏥 MOP (Vasektomi)</SelectItem>
+                      <SelectItem value="MAL">👶 MAL (Metode Amenore Laktasi)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="tanggal_mulai_kb" className="text-sm font-medium">Tanggal Mulai KB</Label>
+                    <Input
+                      id="tanggal_mulai_kb"
+                      type="date"
+                      className="h-11"
+                      value={(formData as any).tanggal_mulai_kb || ''}
+                      onChange={(e) => setFormData({ ...formData, tanggal_mulai_kb: e.target.value })}
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="kb_posyandu" className="text-sm font-medium">Posyandu</Label>
+                    <Input
+                      id="kb_posyandu"
+                      placeholder="Nama posyandu"
+                      className="h-11"
+                      value={(formData as any).posyandu || ''}
+                      onChange={(e) => setFormData({ ...formData, posyandu: e.target.value })}
+                    />
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="kb_keterangan" className="text-sm font-medium">Keterangan</Label>
+                  <Input
+                    id="kb_keterangan"
+                    placeholder="Catatan tambahan (opsional)"
+                    className="h-11"
+                    value={(formData as any).keterangan || ''}
+                    onChange={(e) => setFormData({ ...formData, keterangan: e.target.value })}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+          
+          <DialogFooter className="pt-4 border-t gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => setIsKbDialogOpen(false)} 
+              disabled={saving}
+              className="px-6"
+            >
+              Batal
+            </Button>
+            <Button 
+              onClick={handleSaveKb} 
+              className="bg-pink-600 hover:bg-pink-700 px-6"
+              disabled={saving || !((formData as any).metode_kb || (formData as any).jenis_kb)}
+            >
+              {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              <Heart className="w-4 h-4 mr-2" />
+              Simpan Data KB
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* KB Delete Confirmation Dialog */}
+      <Dialog open={isKbDeleteDialogOpen} onOpenChange={setIsKbDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader className="pb-4">
+            <DialogTitle className="flex items-center gap-3 text-lg text-red-700">
+              <div className="p-2 bg-red-100 rounded-lg">
+                <Trash2 className="w-5 h-5 text-red-600" />
+              </div>
+              Konfirmasi Hapus Data KB
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="py-4">
+            <div className="bg-red-50 border border-red-100 rounded-xl p-4 mb-4">
+              <p className="text-gray-700">
+                Apakah Anda yakin ingin menghapus data KB untuk:
+              </p>
+              <p className="font-semibold text-gray-900 mt-2 text-lg">
+                {kbDeleteItem?.nama || (kbDeleteItem as any)?.nama_warga}
+              </p>
+              {(kbDeleteItem as any)?.jenis_kb && (
+                <p className="text-sm text-gray-600 mt-1">
+                  Metode: <span className="font-medium">{(kbDeleteItem as any).jenis_kb}</span>
+                </p>
+              )}
+            </div>
+            
+            <div className="flex items-start gap-2 text-sm text-gray-500 bg-gray-50 p-3 rounded-lg">
+              <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+              <span>Data WUS tidak akan dihapus, hanya status KB yang akan dihapus (Drop Out).</span>
+            </div>
+          </div>
+          
+          <DialogFooter className="pt-4 border-t gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => setIsKbDeleteDialogOpen(false)} 
+              disabled={saving}
+              className="px-6"
+            >
+              Batal
+            </Button>
+            <Button 
+              onClick={handleConfirmDeleteKb} 
+              variant="destructive" 
+              disabled={saving}
+              className="px-6"
+            >
+              {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              <Trash2 className="w-4 h-4 mr-2" />
+              Hapus KB
             </Button>
           </DialogFooter>
         </DialogContent>

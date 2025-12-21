@@ -4,7 +4,8 @@ import API_CONFIG from '../config/api.js';
 const suratRequestService = {
   // Get all surat requests with optional filters
   getAll: async (params = {}) => {
-    const response = await apiClient.get('/surat-requests', { params });
+    // Pass params directly, not wrapped in an object
+    const response = await apiClient.get('/surat-requests', params);
     return response;
   },
 
@@ -34,6 +35,14 @@ const suratRequestService = {
     return response.data;
   },
 
+  // Generate surat langsung (tanpa request flow)
+  generateDirect: async (templateId, data) => {
+    const response = await apiClient.post(`/surat-templates/${templateId}/generate-direct`, data, {
+      timeout: API_CONFIG.LONG_TIMEOUT // 2 minutes for document generation
+    });
+    return response.data;
+  },
+
   // Staff: Approve and forward to Wali Nagari
   staffApprove: async (id, notes = '') => {
     const response = await apiClient.post(`/surat-requests/${id}/staff-approve`, { notes });
@@ -43,6 +52,14 @@ const suratRequestService = {
   // Staff: Reject
   staffReject: async (id, notes) => {
     const response = await apiClient.post(`/surat-requests/${id}/staff-reject`, { notes });
+    return response.data;
+  },
+
+  // Generate preview PDF (without signature)
+  generatePreview: async (id) => {
+    const response = await apiClient.post(`/surat-requests/${id}/generate-preview`, {}, {
+      timeout: API_CONFIG.LONG_TIMEOUT // 2 minutes for PDF generation
+    });
     return response.data;
   },
 

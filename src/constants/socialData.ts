@@ -49,14 +49,14 @@ export const typeConfig = {
     fields: ["nama", "nik", "alamat", "jorong", "rt", "rw", "status", "tahun_data", "keterangan"],
   },
   stunting: {
-    title: "Data Stunting",
+    title: "Data Balita",
     statusOptions: ["Stunting Berat", "Stunting Ringan", "Normal", "Dalam Pemantauan"],
     fields: ["nama_anak", "nik_anak", "nama_ortu", "alamat", "jorong", "rt", "rw", "status", "usia", "tahun_data", "keterangan"],
   },
   kb: {
     title: "Data KB",
-    statusOptions: ["Aktif", "Drop Out", "Tidak Aktif", "Hamil"],
-    fields: ["nama", "nik", "alamat", "jorong", "rt", "rw", "status", "jenis_kb", "tahun_data", "keterangan"],
+    statusOptions: ["Sudah KB", "Belum KB"],
+    fields: ["nama", "nik", "usia", "alamat", "jorong", "rt", "rw", "status_kb_display", "jenis_kb", "keterangan"],
   },
   disabilitas: {
     title: "Data Disabilitas",
@@ -117,10 +117,9 @@ export const typeColumns: Record<string, { key: string; label: string }[]> = {
   kb: [
     { key: "nama", label: "Nama" },
     { key: "nik", label: "NIK" },
+    { key: "usia", label: "Usia" },
     { key: "jorong", label: "Jorong" },
-    { key: "jenis_kb", label: "Jenis KB" },
-    { key: "status", label: "Status" },
-    { key: "tahun_data", label: "Tahun" },
+    { key: "status_kb_display", label: "Status KB" },
   ],
   disabilitas: [
     { key: "nama", label: "Nama" },
@@ -166,6 +165,8 @@ export const getStatusColor = (status: string): string => {
     "Drop Out": "bg-red-500",
     "Tidak Aktif": "bg-gray-500",
     "Hamil": "bg-purple-500",
+    "Sudah KB": "bg-green-500",
+    "Belum KB": "bg-red-500",
     // Disabilitas
     "Fisik": "bg-blue-500",
     "Intelektual": "bg-purple-500",
@@ -255,7 +256,7 @@ export const detailFieldsConfig: Record<string, DetailFieldConfig[]> = {
     { key: "z_score", label: "Z-Score", type: "number", section: "Data Pengukuran" },
     { key: "tanggal_pengukuran", label: "Tanggal Pengukuran", type: "date", section: "Data Pengukuran" },
     // Status
-    { key: "status", label: "Status Stunting", type: "badge", section: "Status" },
+    { key: "status", label: "Status Pertumbuhan", type: "badge", section: "Status" },
     { key: "status_gizi", label: "Status Gizi", type: "badge", section: "Status" },
     // Intervensi
     { key: "dalam_intervensi", label: "Dalam Intervensi", type: "boolean", section: "Intervensi" },
@@ -271,24 +272,19 @@ export const detailFieldsConfig: Record<string, DetailFieldConfig[]> = {
     { key: "nama", label: "Nama Lengkap", section: "Data Peserta" },
     { key: "nik", label: "NIK", section: "Data Peserta" },
     { key: "tanggal_lahir", label: "Tanggal Lahir", type: "date", section: "Data Peserta" },
+    { key: "usia", label: "Usia", type: "number", section: "Data Peserta" },
     { key: "alamat", label: "Alamat", section: "Data Peserta" },
     { key: "jorong", label: "Jorong", section: "Data Peserta" },
     { key: "rt", label: "RT", section: "Data Peserta" },
     { key: "rw", label: "RW", section: "Data Peserta" },
     // Data KB
-    { key: "status", label: "Status KB", type: "badge", section: "Data KB" },
+    { key: "status_kb_display", label: "Status KB", type: "badge", section: "Data KB" },
+    { key: "is_kb", label: "Sudah KB", type: "boolean", section: "Data KB" },
     { key: "jenis_kb", label: "Jenis KB", section: "Data KB" },
     { key: "tanggal_mulai_kb", label: "Tanggal Mulai KB", type: "date", section: "Data KB" },
     { key: "tanggal_berhenti_kb", label: "Tanggal Berhenti KB", type: "date", section: "Data KB" },
-    { key: "alasan_berhenti", label: "Alasan Berhenti", section: "Data KB" },
     // Data Kehamilan
     { key: "jumlah_anak", label: "Jumlah Anak", type: "number", section: "Data Kehamilan" },
-    { key: "sedang_hamil", label: "Sedang Hamil", type: "boolean", section: "Data Kehamilan" },
-    { key: "usia_kehamilan_minggu", label: "Usia Kehamilan (Minggu)", type: "number", section: "Data Kehamilan" },
-    // Metadata
-    { key: "tahun_data", label: "Tahun Data", section: "Metadata" },
-    { key: "posyandu", label: "Posyandu", section: "Metadata" },
-    { key: "keterangan", label: "Keterangan", section: "Metadata" },
   ],
   disabilitas: [
     // Data Penyandang

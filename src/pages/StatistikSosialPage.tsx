@@ -249,11 +249,11 @@ const categories = [
   },
   { 
     id: 'stunting', 
-    title: 'Data Stunting', 
+    title: 'Data Balita', 
     icon: Baby, 
     color: 'text-red-500',
     bgColor: 'bg-red-50',
-    description: 'Data anak dengan kondisi stunting dan normal'
+    description: 'Data pertumbuhan anak usia 0-59 bulan'
   },
   { 
     id: 'kb', 
@@ -452,12 +452,19 @@ export default function StatistikSosialPage() {
       console.error('Error loading stats:', error);
       toast.error('Gagal memuat statistik: ' + (error.message || 'Unknown error'));
       
-      // Fallback to dummy data if API fails
-      const allStats: Record<string, StatistikData> = {};
+      // Set empty stats instead of dummy data
+      const emptyStats: Record<string, StatistikData> = {};
       for (const cat of categories) {
-        allStats[cat.id] = generateDummyStats(cat.id);
+        emptyStats[cat.id] = {
+          total: 0,
+          byStatus: [],
+          byJorong: [],
+          byGender: [],
+          byAge: [],
+          trend: [],
+        };
       }
-      setStats(allStats);
+      setStats(emptyStats);
     } finally {
       setLoading(false);
     }
@@ -576,11 +583,11 @@ export default function StatistikSosialPage() {
                 <p className="text-lg font-semibold text-red-600">{populationStats.effect_summary.kemiskinan_tidak_aktif}</p>
               </div>
               <div className="bg-white rounded-lg p-3 shadow-sm border-l-4 border-green-500">
-                <p className="text-xs text-muted-foreground">Stunting (Warga Aktif)</p>
+                <p className="text-xs text-muted-foreground">Balita (Warga Aktif)</p>
                 <p className="text-lg font-semibold text-green-600">{populationStats.effect_summary.stunting_aktif}</p>
               </div>
               <div className="bg-white rounded-lg p-3 shadow-sm border-l-4 border-red-500">
-                <p className="text-xs text-muted-foreground">Stunting (Tidak Aktif)</p>
+                <p className="text-xs text-muted-foreground">Balita (Tidak Aktif)</p>
                 <p className="text-lg font-semibold text-red-600">{populationStats.effect_summary.stunting_tidak_aktif}</p>
               </div>
             </div>
@@ -801,16 +808,16 @@ export default function StatistikSosialPage() {
             </CardContent>
           </Card>
 
-          {/* Stunting Calculator - Only show for stunting tab */}
+          {/* Kalkulator Balita - Only show for stunting tab */}
           {activeTab === 'stunting' && (
             <Card className="border-red-200 bg-red-50/50">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-red-700">
                   <Calculator className="h-5 w-5" />
-                  Kalkulator Stunting
+                  Kalkulator Pertumbuhan Balita
                 </CardTitle>
                 <CardDescription>
-                  Hitung status stunting anak berdasarkan standar WHO
+                  Hitung status pertumbuhan anak berdasarkan standar WHO
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -878,7 +885,7 @@ export default function StatistikSosialPage() {
                   onClick={handleCalculateStunting}
                 >
                   <Calculator className="h-4 w-4 mr-2" />
-                  Hitung Status Stunting
+                  Hitung Status Pertumbuhan
                 </Button>
 
                 {stuntingResult && (

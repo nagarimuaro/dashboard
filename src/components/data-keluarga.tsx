@@ -5,9 +5,11 @@ import { Input } from "./ui/input"
 import { Badge } from "./ui/badge"
 import { Label } from "./ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "./ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./ui/dropdown-menu"
+import { Progress } from "./ui/progress"
 import { keluargaService } from "../services/keluargaService"
 import { wargaService } from "../services/wargaService"
 import { 
@@ -28,7 +30,12 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
-  ChevronsRight
+  ChevronsRight,
+  Filter,
+  ChevronUp,
+  ChevronDown,
+  FileText,
+  FileSpreadsheet
 } from "lucide-react"
 
 interface DataKeluargaProps {
@@ -400,9 +407,13 @@ export function DataKeluarga({ userRole, onNavigateToDetail }: DataKeluargaProps
   const [loading, setLoading] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
+  const [totalData, setTotalData] = useState(0)
   const [selectedJorong, setSelectedJorong] = useState<string>("all")
   const [selectedRT, setSelectedRT] = useState<string>("all")
   const [selectedRW, setSelectedRW] = useState<string>("all")
+  const [showAdvancedFilter, setShowAdvancedFilter] = useState(false)
+  const [exportLoading, setExportLoading] = useState(false)
+  const [exportProgress, setExportProgress] = useState(0)
   
   // Form states
   const [allWarga, setAllWarga] = useState<any[]>([])
@@ -446,6 +457,7 @@ export function DataKeluarga({ userRole, onNavigateToDetail }: DataKeluargaProps
       // Laravel pagination structure: { data: [...], meta: { last_page, ... } }
       setKeluargaData(response.data || [])
       setTotalPages(response.meta?.last_page || response.last_page || 1)
+      setTotalData(response.meta?.total || response.total || 0)
     } catch (error) {
       console.error('Error loading keluarga data:', error)
     } finally {
@@ -453,61 +465,91 @@ export function DataKeluarga({ userRole, onNavigateToDetail }: DataKeluargaProps
     }
   }
 
-  // Load all warga for form
-  const loadAllWarga = async () => {
+  // Load warga by No KK for form (on-demand, not all at once)
+  const loadWargaByNoKK = async (noKK: string) => {
+    if (!noKK || noKK.length < 10) {
+      setFilteredWarga([])
+      return
+    }
     try {
-      console.log('📥 Loading all warga...')
-      const response = await wargaService.getAll({ per_page: 1000 })
+      console.log('📥 Loading warga by No KK:', noKK)
+      const response = await wargaService.getAll({ no_kk: noKK, per_page: 50 })
       console.log('✅ Warga loaded:', response.data?.length || 0)
-      if (response.data && response.data.length > 0) {
-        console.log('📋 Sample warga structure:', response.data[0])
-      }
-      setAllWarga(response.data || [])
+      setFilteredWarga(response.data || [])
+      setAllWarga(response.data || []) // For member selection
     } catch (error) {
       console.error('❌ Error loading warga:', error)
+      setFilteredWarga([])
     }
   }
 
-  // Load data on component mount and when filters change
+  // Load keluarga data when filters/pagination change
   useEffect(() => {
     loadKeluargaData()
-    loadAllWarga()
   }, [currentPage, searchTerm, selectedJorong, selectedRT, selectedRW])
-  
-  // Filter warga based on inputted No KK (not from selected kepala keluarga)
+
+  // Load warga by No KK when user types in form (with debounce)
   useEffect(() => {
-    console.log('🔍 Filtering warga by No KK:', formData.no_kk)
-    console.log('📊 Total allWarga:', allWarga.length)
-    
-    if (formData.no_kk && formData.no_kk.length > 0) {
-      // Check sample warga structure
-      if (allWarga.length > 0) {
-        console.log('📋 Sample warga:', allWarga[0])
+    const debounceTimer = setTimeout(() => {
+      if (formData.no_kk && formData.no_kk.length >= 10) {
+        loadWargaByNoKK(formData.no_kk)
+      } else {
+        setFilteredWarga([])
       }
+    }, 500)
+    
+    return () => clearTimeout(debounceTimer)
+  }, [formData.no_kk])
+  
+  // Auto-reset kepala keluarga if No KK changed
+  useEffect(() => {
+    if (selectedKepalaKeluarga && selectedKepalaKeluarga.no_kk !== formData.no_kk) {
+      console.log('🔄 Resetting kepala keluarga due to No KK change')
+      setSelectedKepalaKeluarga(null)
+      setFormData(prev => ({...prev, kepala_keluarga_id: ''}))
+      setAdditionalMembers([])
+    }
+  }, [formData.no_kk, selectedKepalaKeluarga])
+
+  // Handle export
+  const handleExport = async (format: 'pdf' | 'csv') => {
+    try {
+      setExportLoading(true)
+      setExportProgress(0)
       
-      const filtered = allWarga.filter(w => {
-        // Debug: log comparison
-        const match = w.no_kk === formData.no_kk
-        if (match) {
-          console.log('✅ Match found:', w.nama_lengkap || w.nama, 'No KK:', w.no_kk)
+      const filterParams: any = {}
+      if (searchTerm) filterParams.search = searchTerm
+      if (selectedJorong !== 'all') filterParams.jorong = selectedJorong
+      if (selectedRT !== 'all') filterParams.rt = selectedRT
+      if (selectedRW !== 'all') filterParams.rw = selectedRW
+      
+      const blob = await (keluargaService as any).exportWithDownload(filterParams, format, (progress: number) => {
+        if (progress >= 0) {
+          setExportProgress(progress)
         }
-        return match
       })
       
-      console.log('✅ Filtered warga count:', filtered.length)
-      setFilteredWarga(filtered)
+      setExportProgress(100)
       
-      // Auto-reset kepala keluarga if No KK changed and doesn't match anymore
-      if (selectedKepalaKeluarga && selectedKepalaKeluarga.no_kk !== formData.no_kk) {
-        console.log('🔄 Resetting kepala keluarga due to No KK change')
-        setSelectedKepalaKeluarga(null)
-        setFormData(prev => ({...prev, kepala_keluarga_id: ''}))
-        setAdditionalMembers([]) // Also clear additional members
-      }
-    } else {
-      setFilteredWarga([])
+      // Create download link
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `data_keluarga_${new Date().toISOString().slice(0, 10)}.${format}`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+    } catch (error) {
+      console.error('Export failed:', error)
+      alert('Gagal mengekspor data. Silakan coba lagi.')
+    } finally {
+      setTimeout(() => {
+        setExportLoading(false)
+        setExportProgress(0)
+      }, 500)
     }
-  }, [formData.no_kk, allWarga, selectedKepalaKeluarga])
+  }
 
   // Handle search
   const handleSearch = (value: string) => {
@@ -725,77 +767,140 @@ export function DataKeluarga({ userRole, onNavigateToDetail }: DataKeluargaProps
     setSelectedKepalaKeluarga(null)
   }
 
+  // Reset all filters
+  const handleResetFilters = () => {
+    setSearchTerm("")
+    setSelectedJorong("all")
+    setSelectedRT("all")
+    setSelectedRW("all")
+    setCurrentPage(1)
+  }
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1>Data Keluarga</h1>
-          <p className="text-muted-foreground">Kelola data kartu keluarga dan anggota keluarga</p>
-        </div>
-        {userRole !== 'warga' && (
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm">
-              <Upload className="h-4 w-4 mr-2" />
-              Import Data
-            </Button>
-            <Button variant="outline" size="sm">
-              <Download className="h-4 w-4 mr-2" />
-              Export Data
-            </Button>
-            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Buat KK Baru
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-h-[90vh] flex flex-col">
-                <DialogHeader>
-                  <DialogTitle>Buat Kartu Keluarga Baru</DialogTitle>
-                  <DialogDescription>
-                    Isi data untuk membuat kartu keluarga baru
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="overflow-y-auto flex-1 pr-2">
-                  <KeluargaFormComponent
-                    formData={formData}
-                    allWarga={allWarga}
-                    filteredWarga={filteredWarga}
-                    selectedKepalaKeluarga={selectedKepalaKeluarga}
-                    additionalMembers={additionalMembers}
-                    formError={formError}
-                    onFormDataChange={handleFormDataChange}
-                    onKepalaKeluargaChange={handleKepalaKeluargaSelect}
-                    onAdditionalMembersChange={handleAdditionalMembersUpdate}
-                    onSubmit={handleFormSubmit}
-                    onCancel={handleFormCancel}
-                  />
-                </div>
-              </DialogContent>
-            </Dialog>
-          </div>
-        )}
-      </div>
-
-      {/* Search and Filters */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="space-y-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Cari berdasarkan No. KK, kepala keluarga, atau alamat..."
-                value={searchTerm}
-                onChange={(e) => handleSearch(e.target.value)}
-                className="pl-10"
-              />
+      {/* Export Progress Dialog */}
+      {exportLoading && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <Card className="w-80 p-6">
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                <span className="font-medium">
+                  {exportProgress === 100 ? 'Download selesai!' : 'Mengekspor data...'}
+                </span>
+              </div>
+              <Progress value={exportProgress} className="h-2" />
+              <p className="text-sm text-muted-foreground text-center">
+                {exportProgress}%
+              </p>
             </div>
-            
-            <div className="flex flex-wrap gap-4">
-              <div className="flex-1 min-w-[200px]">
-                <Label htmlFor="jorong">Jorong</Label>
-                <Select value={selectedJorong} onValueChange={setSelectedJorong}>
+          </Card>
+        </div>
+      )}
+
+      {/* Data Table */}
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <CardDescription>
+                {loading ? 'Memuat data...' : `Menampilkan ${keluargaData.length} dari ${totalData} keluarga`}
+              </CardDescription>
+            </div>
+            <div className="flex gap-2 items-center flex-wrap">
+              <div className="relative flex items-center h-9 px-3 border border-input bg-background rounded-md hover:bg-accent hover:text-accent-foreground">
+                <Search className="h-4 w-4 text-muted-foreground mr-2" />
+                <Input
+                  placeholder="Cari No KK atau nama..."
+                  value={searchTerm}
+                  onChange={(e) => handleSearch(e.target.value)}
+                  className="border-0 p-0 h-auto w-[150px] focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent"
+                />
+              </div>
+              <Button 
+                variant="outline" 
+                onClick={() => setShowAdvancedFilter(!showAdvancedFilter)}
+                className="gap-2"
+              >
+                <Filter className="h-4 w-4" />
+                Filter
+                {showAdvancedFilter ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              </Button>
+              {userRole !== 'warga' && (
+                <>
+                  {/* Export Button with Dropdown */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" disabled={exportLoading}>
+                        {exportLoading ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Download className="h-4 w-4 mr-2" />
+                        )}
+                        Export
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => handleExport('pdf')}>
+                        <FileText className="h-4 w-4 mr-2 text-red-600" />
+                        PDF
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleExport('csv')}>
+                        <FileSpreadsheet className="h-4 w-4 mr-2 text-green-600" />
+                        CSV
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+
+                  {/* Add KK Button */}
+                  <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button 
+                        style={{ backgroundColor: '#2563eb', color: 'white' }}
+                        className="hover:bg-blue-700"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Buat KK Baru
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-h-[90vh] flex flex-col">
+                      <DialogHeader>
+                        <DialogTitle>Buat Kartu Keluarga Baru</DialogTitle>
+                        <DialogDescription>
+                          Isi data untuk membuat kartu keluarga baru
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="overflow-y-auto flex-1 pr-2">
+                        <KeluargaFormComponent
+                          formData={formData}
+                          allWarga={allWarga}
+                          filteredWarga={filteredWarga}
+                          selectedKepalaKeluarga={selectedKepalaKeluarga}
+                          additionalMembers={additionalMembers}
+                          formError={formError}
+                          onFormDataChange={handleFormDataChange}
+                          onKepalaKeluargaChange={handleKepalaKeluargaSelect}
+                          onAdditionalMembersChange={handleAdditionalMembersUpdate}
+                          onSubmit={handleFormSubmit}
+                          onCancel={handleFormCancel}
+                        />
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                </>
+              )}
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {/* Advanced Filter Panel */}
+          {showAdvancedFilter && (
+            <div className="mb-4 p-4 border rounded-lg bg-muted/30 space-y-4">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {/* Jorong */}
+                <div className="space-y-2">
+                  <Label>Jorong</Label>
+                  <Select value={selectedJorong} onValueChange={setSelectedJorong}>
                   <SelectTrigger>
                     <SelectValue placeholder="Pilih Jorong" />
                   </SelectTrigger>
@@ -836,34 +941,27 @@ export function DataKeluarga({ userRole, onNavigateToDetail }: DataKeluargaProps
                     <SelectItem value="03">RW 03</SelectItem>
                   </SelectContent>
                 </Select>
+                </div>
               </div>
               
-              {loading && (
-                <div className="flex items-end">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                </div>
-              )}
+              {/* Reset Filter Button */}
+              <div className="flex justify-end pt-2">
+                <Button variant="outline" size="sm" onClick={handleResetFilters}>
+                  Reset Filter
+                </Button>
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          )}
 
-      <Tabs defaultValue="list" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="list">Daftar Keluarga</TabsTrigger>
-          <TabsTrigger value="tree">Pohon Keluarga</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="list" className="space-y-4">
           {/* Stats Cards */}
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-3 mb-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Total KK</CardTitle>
                 <Home className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{keluargaData.length}</div>
+                <div className="text-2xl font-bold">{totalData}</div>
                 <p className="text-xs text-muted-foreground">Kartu keluarga terdaftar</p>
               </CardContent>
             </Card>
@@ -875,9 +973,9 @@ export function DataKeluarga({ userRole, onNavigateToDetail }: DataKeluargaProps
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  {keluargaData.reduce((total, kk) => total + kk.jumlahAnggota, 0)}
+                  {keluargaData.reduce((total, kk) => total + (kk.anggotas?.length || kk.anggotas_count || 0), 0)}
                 </div>
-                <p className="text-xs text-muted-foreground">Anggota keluarga</p>
+                <p className="text-xs text-muted-foreground">Anggota keluarga (halaman ini)</p>
               </CardContent>
             </Card>
 
@@ -889,7 +987,7 @@ export function DataKeluarga({ userRole, onNavigateToDetail }: DataKeluargaProps
               <CardContent>
                 <div className="text-2xl font-bold">
                   {keluargaData.length > 0 
-                    ? (keluargaData.reduce((total, kk) => total + kk.jumlahAnggota, 0) / keluargaData.length).toFixed(1)
+                    ? (keluargaData.reduce((total, kk) => total + (kk.anggotas?.length || kk.anggotas_count || 0), 0) / keluargaData.length).toFixed(1)
                     : '0'}
                 </div>
                 <p className="text-xs text-muted-foreground">Orang per keluarga</p>
@@ -898,31 +996,23 @@ export function DataKeluarga({ userRole, onNavigateToDetail }: DataKeluargaProps
           </div>
 
           {/* Data Table */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Daftar Kartu Keluarga</CardTitle>
-              <CardDescription>
-                Menampilkan {keluargaData.length} keluarga
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="rounded-md border max-h-[600px] overflow-y-auto">
-                <Table>
-                  <TableHeader className="sticky top-0 bg-background z-10">
-                    <TableRow>
-                      <TableHead className="w-[50px]">No</TableHead>
-                      <TableHead>No. KK</TableHead>
-                      <TableHead>Kepala Keluarga</TableHead>
-                      <TableHead>Alamat</TableHead>
-                      <TableHead>RT/RW</TableHead>
-                      <TableHead>Jorong</TableHead>
-                      <TableHead className="text-center">Jumlah Anggota</TableHead>
-                      <TableHead className="text-center">Aksi</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {loading ? (
-                      Array.from({ length: 5 }).map((_, index) => (
+          <div className="rounded-md border max-h-[600px] overflow-y-auto">
+            <Table>
+              <TableHeader className="sticky top-0 bg-background z-10">
+                <TableRow>
+                  <TableHead className="w-[50px]">No</TableHead>
+                  <TableHead>No. KK</TableHead>
+                  <TableHead>Kepala Keluarga</TableHead>
+                  <TableHead>Alamat</TableHead>
+                  <TableHead>RT/RW</TableHead>
+                  <TableHead>Jorong</TableHead>
+                  <TableHead className="text-center">Jumlah Anggota</TableHead>
+                  <TableHead className="text-center">Aksi</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  Array.from({ length: 5 }).map((_, index) => (
                         <TableRow key={index}>
                           <TableCell><div className="h-4 bg-gray-200 rounded animate-pulse"></div></TableCell>
                           <TableCell><div className="h-4 bg-gray-200 rounded animate-pulse"></div></TableCell>
@@ -1025,7 +1115,7 @@ export function DataKeluarga({ userRole, onNavigateToDetail }: DataKeluargaProps
               {/* Pagination inside table card */}
               <div className="flex items-center justify-between mt-4 pt-4 border-t">
                 <div className="text-sm text-muted-foreground">
-                  Halaman {currentPage} dari {totalPages} ({keluargaData.length} data)
+                  Halaman {currentPage} dari {totalPages} ({totalData} data)
                 </div>
                 {totalPages > 1 && (
                   <div className="flex items-center gap-1">
@@ -1101,43 +1191,8 @@ export function DataKeluarga({ userRole, onNavigateToDetail }: DataKeluargaProps
                   </div>
                 )}
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="tree" className="space-y-4">
-          <div className="grid gap-6">
-            {loading ? (
-              Array.from({ length: 3 }).map((_, index) => (
-                <Card key={index}>
-                  <CardHeader>
-                    <div className="h-6 bg-gray-200 rounded animate-pulse"></div>
-                    <div className="h-4 bg-gray-200 rounded animate-pulse w-2/3"></div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="h-32 bg-gray-200 rounded animate-pulse"></div>
-                  </CardContent>
-                </Card>
-              ))
-            ) : keluargaData.map((keluarga: any) => (
-              <Card key={keluarga.id}>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <TreePine className="h-5 w-5" />
-                    Keluarga {keluarga.kepala_keluarga?.nama || 'Belum ada kepala keluarga'}
-                  </CardTitle>
-                  <CardDescription>
-                    No. KK: {keluarga.no_kk} • {[keluarga.alamat, keluarga.rt && `RT ${keluarga.rt}`, keluarga.rw && `RW ${keluarga.rw}`, keluarga.jorong].filter(Boolean).join(', ')}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <FamilyTreeVisualizer anggota={keluarga.anggotas || []} />
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </TabsContent>
-      </Tabs>
+        </CardContent>
+      </Card>
     </div>
   )
 }

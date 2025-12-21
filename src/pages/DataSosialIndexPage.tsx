@@ -22,7 +22,7 @@ const categories = [
   {
     id: "kesehatan",
     title: "Data Kesehatan",
-    description: "Monitoring kesehatan masyarakat meliputi stunting, KB, dan disabilitas",
+    description: "Monitoring kesehatan masyarakat meliputi pertumbuhan balita, KB, dan disabilitas",
     icon: Heart,
     color: "bg-red-500",
     lightColor: "bg-red-50",
@@ -32,7 +32,7 @@ const categories = [
     items: [
       {
         id: "stunting",
-        title: "Data Stunting",
+        title: "Data Balita",
         description: "Pemantauan pertumbuhan anak usia 0-59 bulan dengan standar WHO",
         icon: Baby,
         features: ["Analisis WHO LMS", "Z-Score Calculator", "Grafik Pertumbuhan"],

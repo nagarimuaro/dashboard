@@ -102,13 +102,31 @@ class ApiClient {
     return this.defaultHeaders['Authorization'];
   }
 
-  // Build full URL
-  buildUrl(endpoint) {
+  // Build full URL with query parameters
+  buildUrl(endpoint, params = {}) {
+    let url;
     if (endpoint.startsWith('http')) {
-      return endpoint;
+      url = endpoint;
+    } else {
+      const cleanEndpoint = endpoint.startsWith('/') ? endpoint.slice(1) : endpoint;
+      url = `${this.baseURL}/${cleanEndpoint}`;
     }
-    const cleanEndpoint = endpoint.startsWith('/') ? endpoint.slice(1) : endpoint;
-    return `${this.baseURL}/${cleanEndpoint}`;
+    
+    // Add query parameters if provided
+    if (params && Object.keys(params).length > 0) {
+      const searchParams = new URLSearchParams();
+      for (const [key, value] of Object.entries(params)) {
+        if (value !== undefined && value !== null && value !== '') {
+          searchParams.append(key, value);
+        }
+      }
+      const queryString = searchParams.toString();
+      if (queryString) {
+        url += (url.includes('?') ? '&' : '?') + queryString;
+      }
+    }
+    
+    return url;
   }
 
   // Handle API responses
@@ -221,13 +239,16 @@ class ApiClient {
         method,
         hasAuth: !!config.headers['Authorization'],
         authHeader: config.headers['Authorization']?.substring(0, 30) + '...',
-        storedToken: storedToken ? storedToken.substring(0, 20) + '...' : 'null'
+        storedToken: storedToken ? storedToken.substring(0, 20) + '...' : 'null',
+        bodyIsFormData: config.body instanceof FormData
       });
     }
     
     // Remove Content-Type for FormData (let browser set it with boundary)
-    if (options.body instanceof FormData) {
+    // IMPORTANT: Check FormData FIRST before any other body processing
+    if (config.body instanceof FormData) {
       delete config.headers['Content-Type'];
+      console.log('📤 Sending FormData, removed Content-Type header');
     } else if (config.body && typeof config.body === 'object' && !(config.body instanceof Blob)) {
       // Only stringify if it's a plain object (not FormData, Blob, etc.)
       try {
@@ -308,8 +329,8 @@ class ApiClient {
   }
 
   // Download file as blob
-  async downloadBlob(endpoint) {
-    const url = this.buildUrl(endpoint);
+  async downloadBlob(endpoint, params = {}) {
+    const url = this.buildUrl(endpoint, params);
     
     // Get fresh token from localStorage
     const storedToken = localStorage.getItem('auth_token');
@@ -337,6 +358,61 @@ class ApiClient {
     }
     
     return response.blob();
+  }
+
+  // Download file as blob with progress tracking
+  downloadBlobWithProgress(endpoint, params = {}, onProgress = null) {
+    return new Promise((resolve, reject) => {
+      const url = this.buildUrl(endpoint, params);
+      const storedToken = localStorage.getItem('auth_token');
+      
+      const xhr = new XMLHttpRequest();
+      xhr.responseType = 'blob';
+      
+      // Progress event for download
+      xhr.addEventListener('progress', (event) => {
+        if (event.lengthComputable && onProgress) {
+          const progress = Math.round((event.loaded * 100) / event.total);
+          onProgress(progress);
+        } else if (onProgress) {
+          // If content-length is not available, show indeterminate progress
+          onProgress(-1);
+        }
+      });
+      
+      // Load event (success)
+      xhr.addEventListener('load', () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          if (onProgress) onProgress(100);
+          resolve(xhr.response);
+        } else if (xhr.status === 401) {
+          reject(new Error('Session expired. Please login again.'));
+        } else {
+          reject(new Error(`Download failed: ${xhr.status}`));
+        }
+      });
+      
+      // Error event
+      xhr.addEventListener('error', () => {
+        reject(new Error('Network error during download'));
+      });
+      
+      // Timeout event
+      xhr.addEventListener('timeout', () => {
+        reject(new Error('Download timeout'));
+      });
+      
+      xhr.open('GET', url);
+      
+      // Set headers
+      if (storedToken) {
+        xhr.setRequestHeader('Authorization', `Bearer ${storedToken}`);
+      }
+      xhr.setRequestHeader('Accept', 'application/json');
+      xhr.setRequestHeader(API_CONFIG.TENANT_HEADER, this.getTenant());
+      
+      xhr.send();
+    });
   }
 
   // Public endpoints (no authentication required)

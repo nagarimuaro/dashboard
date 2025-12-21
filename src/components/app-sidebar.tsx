@@ -27,6 +27,12 @@ import {
   Accessibility,
   Home,
   GraduationCap,
+  TrendingUp,
+  TrendingDown,
+  UserCheck,
+  Stethoscope,
+  Syringe,
+  BabyIcon,
 } from "lucide-react"
 
 import {
@@ -109,8 +115,13 @@ export function AppSidebar({ activeModule, onModuleChange, userRole, nagariName 
       icon: DollarSign,
       key: "keuangan",
       items: [
-        { title: "APB Dashboard", key: "keuangan-apb" },
-        { title: "Realisasi Anggaran", key: "keuangan-realisasi" },
+        { title: "Dashboard APB", key: "keuangan-dashboard", icon: BarChart3 },
+        { title: "Pendapatan", key: "keuangan-pendapatan", icon: TrendingUp },
+        { title: "Belanja", key: "keuangan-belanja", icon: TrendingDown },
+        { title: "Pembiayaan", key: "keuangan-pembiayaan", icon: Wallet },
+        { title: "Transaksi", key: "keuangan-transaksi", icon: FileText },
+        { title: "Laporan", key: "keuangan-laporan", icon: FileText },
+        { title: "Aset Nagari", key: "keuangan-aset", icon: Building2 },
       ],
     },
     
@@ -132,15 +143,30 @@ export function AppSidebar({ activeModule, onModuleChange, userRole, nagariName 
       key: "data-sosial",
       items: [
         { title: "Data Kemiskinan", key: "data-kemiskinan", icon: Wallet },
-        { title: "Data Stunting", key: "data-stunting", icon: Baby },
+        { title: "Data Balita", key: "data-stunting", icon: Baby },
         { title: "Data KB", key: "data-kb", icon: HeartPulse },
         { title: "Data Disabilitas", key: "data-disabilitas", icon: Accessibility },
         { title: "Data Rumah Tidak Layak", key: "data-rtlh", icon: Home },
         { title: "Data Putus Sekolah", key: "data-putus-sekolah", icon: GraduationCap },
+        // Kesehatan (Posyandu)
+        { title: "Data Kehamilan", key: "kader-kehamilan", icon: HeartPulse },
+        { title: "Data Imunisasi", key: "kader-imunisasi", icon: Syringe },
+        { title: "Data Persalinan", key: "kader-persalinan", icon: BabyIcon },
       ],
     },
     
-    // 8. PENGADUAN
+    // 8. KADER / POSYANDU
+    {
+      title: "Kader Posyandu",
+      icon: Stethoscope,
+      key: "kader",
+      items: [
+        { title: "Manajemen Kader", key: "kader-management", icon: UserCheck },
+        { title: "Kelompok Kader", key: "kader-kelompok", icon: Users },
+      ],
+    },
+    
+    // 9. PENGADUAN
     {
       title: "Pengaduan",
       icon: MessageSquare,

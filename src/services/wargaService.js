@@ -66,9 +66,74 @@ export const wargaService = {
     return apiClient.get('/wargas/export', params);
   },
 
-  // Bulk import warga
+  // Export warga data to PDF/CSV with download
+  exportWithDownload: async (filters = {}, format = 'pdf', onProgress = null) => {
+    const params = { ...filters, format };
+    return apiClient.downloadBlobWithProgress('/wargas/export', params, onProgress);
+  },
+
+  // Bulk import warga from Excel/CSV with progress callback
   bulkImport: async (file, onProgress = null) => {
-    return apiClient.upload('/wargas/import', file, onProgress);
+    return new Promise((resolve, reject) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const xhr = new XMLHttpRequest();
+      
+      // Progress event
+      xhr.upload.addEventListener('progress', (event) => {
+        if (event.lengthComputable && onProgress) {
+          const progress = Math.round((event.loaded * 100) / event.total);
+          onProgress(progress);
+        }
+      });
+      
+      // Load event (success)
+      xhr.addEventListener('load', () => {
+        try {
+          const response = JSON.parse(xhr.responseText);
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve(response);
+          } else {
+            reject(new Error(response.message || `Upload failed: ${xhr.status}`));
+          }
+        } catch (e) {
+          reject(new Error('Invalid response from server'));
+        }
+      });
+      
+      // Error event
+      xhr.addEventListener('error', () => {
+        reject(new Error('Network error during upload'));
+      });
+      
+      // Timeout event
+      xhr.addEventListener('timeout', () => {
+        reject(new Error('Upload timeout - file mungkin terlalu besar'));
+      });
+      
+      // Get API URL and token
+      const baseUrl = apiClient.baseURL || 'https://cilandak.sintanagari.cloud/api';
+      const token = localStorage.getItem('auth_token');
+      const tenant = window.location.hostname.split('.')[0] || 'cilandak';
+      
+      xhr.open('POST', `${baseUrl}/wargas/import`);
+      xhr.timeout = 300000; // 5 minutes timeout
+      
+      // Set headers
+      if (token) {
+        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      }
+      xhr.setRequestHeader('Accept', 'application/json');
+      xhr.setRequestHeader('X-Tenant-Domain', tenant);
+      
+      xhr.send(formData);
+    });
+  },
+
+  // Download import template
+  downloadTemplate: async () => {
+    return apiClient.downloadBlob('/wargas/template/download');
   },
 
   // Get warga by jorong

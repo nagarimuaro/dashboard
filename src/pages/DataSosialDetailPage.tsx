@@ -239,19 +239,24 @@ export default function DataSosialDetailPage({
     loadData();
   }, [type, itemId]);
 
-  // Load growth history for stunting
+  // Load growth history for stunting/balita
   useEffect(() => {
     const loadGrowthHistory = async () => {
       if (type !== "stunting" || !item) return;
       
       setLoadingHistory(true);
       try {
-        const response = await socialDataService.getGrowthHistory(itemId) as { data?: GrowthHistoryItem[] | { data?: GrowthHistoryItem[] } };
+        // For balita, itemId is already warga_id, so call getChildGrowthHistory directly
+        const response = await socialDataService.getChildGrowthHistory(itemId) as { data?: GrowthHistoryItem[] | { data?: GrowthHistoryItem[] }, success?: boolean };
+        console.log('Growth history response:', response);
+        
         if (response?.data) {
           const historyData = Array.isArray(response.data) 
             ? response.data 
             : (response.data as { data?: GrowthHistoryItem[] }).data || [];
           setGrowthHistory(historyData);
+        } else if (Array.isArray(response)) {
+          setGrowthHistory(response);
         }
       } catch (err) {
         console.error("Failed to load growth history:", err);
@@ -265,17 +270,34 @@ export default function DataSosialDetailPage({
   // Calculate stunting analysis
   useEffect(() => {
     if (item && type === "stunting") {
-      const usia = item.usia_bulan as number | undefined;
-      const tinggi = item.tinggi_badan as number | undefined;
-      const jk = item.jenis_kelamin as string | undefined;
-      
-      if (usia && tinggi && jk) {
-        const result = calculateStuntingStatus(
-          Number(usia),
-          Number(tinggi),
-          jk as "L" | "P"
-        );
-        setStuntingAnalysis(result);
+      // For balita, check if already has stunting data from backend
+      if (item.status_stunting && item.z_score_hfa !== undefined) {
+        // Use data from backend (already calculated)
+        const colorMap: Record<string, string> = {
+          'red': '#ef4444',
+          'orange': '#f97316', 
+          'green': '#22c55e',
+          'gray': '#9ca3af'
+        };
+        setStuntingAnalysis({
+          status: item.status_stunting as string,
+          zscore: Number(item.z_score_hfa) || 0,
+          color: colorMap[item.status_stunting_color as string] || '#9ca3af'
+        });
+      } else {
+        // Calculate manually if no backend data
+        const usia = item.usia_bulan as number | undefined;
+        const tinggi = (item.tinggi_badan || item.last_tinggi_cm) as number | undefined;
+        const jk = item.jenis_kelamin as string | undefined;
+        
+        if (usia && tinggi && jk) {
+          const result = calculateStuntingStatus(
+            Number(usia),
+            Number(tinggi),
+            jk as "L" | "P"
+          );
+          setStuntingAnalysis(result);
+        }
       }
     }
   }, [item, type]);
@@ -454,13 +476,23 @@ export default function DataSosialDetailPage({
 
           <TabsContent value="analysis" className="space-y-4 mt-4">
             {/* Stunting Analysis */}
-            {stuntingAnalysis && (
+            {stuntingAnalysis ? (
               <Card className="border-2" style={{ borderColor: `${stuntingAnalysis.color}40` }}>
                 <CardHeader className="pb-2">
                   <CardTitle className="flex items-center gap-2">
                     <Activity className="w-5 h-5" style={{ color: stuntingAnalysis.color }} />
                     Hasil Analisis (Standar WHO)
                   </CardTitle>
+                  {item.last_measurement_date && (
+                    <CardDescription>
+                      Pengukuran terakhir: {new Date(item.last_measurement_date as string).toLocaleDateString('id-ID', {
+                        day: 'numeric',
+                        month: 'long',
+                        year: 'numeric'
+                      })}
+                      {item.last_measured_by && ` oleh ${item.last_measured_by}`}
+                    </CardDescription>
+                  )}
                 </CardHeader>
                 <CardContent>
                   <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
@@ -481,7 +513,7 @@ export default function DataSosialDetailPage({
                             {stuntingAnalysis.status}
                           </p>
                           <p className="text-muted-foreground">
-                            Z-Score: <strong>{stuntingAnalysis.zscore.toFixed(2)} SD</strong>
+                            Z-Score TB/U: <strong>{stuntingAnalysis.zscore.toFixed(2)} SD</strong>
                           </p>
                         </div>
                       </div>
@@ -491,20 +523,27 @@ export default function DataSosialDetailPage({
                       <div className="p-4 bg-gray-50 rounded-lg">
                         <Calendar className="w-5 h-5 mx-auto mb-1 text-gray-500" />
                         <p className="text-xs text-muted-foreground">Usia</p>
-                        <p className="text-lg font-semibold">{item.usia_bulan} bln</p>
+                        <p className="text-lg font-semibold">{item.usia_bulan || item.usia_format || '-'} {typeof item.usia_bulan === 'number' ? 'bln' : ''}</p>
                       </div>
                       <div className="p-4 bg-gray-50 rounded-lg">
                         <Ruler className="w-5 h-5 mx-auto mb-1 text-gray-500" />
                         <p className="text-xs text-muted-foreground">Tinggi</p>
-                        <p className="text-lg font-semibold">{item.tinggi_badan} cm</p>
+                        <p className="text-lg font-semibold">{item.last_tinggi_cm || item.tinggi_badan || '-'} cm</p>
                       </div>
                       <div className="p-4 bg-gray-50 rounded-lg">
                         <Scale className="w-5 h-5 mx-auto mb-1 text-gray-500" />
                         <p className="text-xs text-muted-foreground">Berat</p>
-                        <p className="text-lg font-semibold">{item.berat_badan} kg</p>
+                        <p className="text-lg font-semibold">{item.last_berat_kg || item.berat_badan || '-'} kg</p>
                       </div>
                     </div>
                   </div>
+
+                  {/* Additional Status from Backend */}
+                  {item.status_gizi && (
+                    <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                      <p className="text-sm"><strong>Status Gizi:</strong> {item.status_gizi}</p>
+                    </div>
+                  )}
 
                   {/* Z-Score Scale */}
                   <div className="mt-6 p-4 bg-gray-50 rounded-lg">
@@ -539,6 +578,16 @@ export default function DataSosialDetailPage({
                   </div>
                 </CardContent>
               </Card>
+            ) : (
+              <Card>
+                <CardContent className="py-12">
+                  <div className="text-center text-muted-foreground">
+                    <Activity className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                    <p className="text-lg font-medium">Belum Ada Data Pengukuran</p>
+                    <p className="text-sm mt-2">Anak belum pernah diukur. Lakukan pengukuran dengan mengklik tombol "Ukur" di halaman daftar balita.</p>
+                  </div>
+                </CardContent>
+              </Card>
             )}
           </TabsContent>
 
@@ -557,7 +606,8 @@ export default function DataSosialDetailPage({
                 <CardContent className="py-12">
                   <div className="text-center text-muted-foreground">
                     <Activity className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                    <p>Belum ada riwayat pengukuran</p>
+                    <p className="text-lg font-medium">Belum Ada Riwayat Pengukuran</p>
+                    <p className="text-sm mt-2">Riwayat pertumbuhan akan muncul setelah dilakukan pengukuran pertama.</p>
                   </div>
                 </CardContent>
               </Card>

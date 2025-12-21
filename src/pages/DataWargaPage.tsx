@@ -15,25 +15,6 @@ export function DataWargaPage() {
   
   return (
     <div className="space-y-6">
-      {/* Page Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold">Data Warga</h1>
-          <p className="text-gray-600">Kelola data warga Nagari</p>
-        </div>
-        
-        {/* Add Button for non-warga users */}
-        {userRole !== 'warga' && (
-          <Link 
-            to="/kependudukan/data-warga/add"
-            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 inline-flex items-center"
-          >
-            <span className="mr-2">+</span>
-            Tambah Warga Baru
-          </Link>
-        )}
-      </div>
-      
       {/* Data Warga Component */}
       <DataWarga
         userRole={userRole as 'admin_global' | 'admin_nagari' | 'staff_nagari' | 'warga'}
