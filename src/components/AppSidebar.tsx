@@ -17,6 +17,10 @@ import {
   Stethoscope,
   MapPin,
   Store,
+  PieChart,
+  Baby,
+  School,
+  Beef,
 } from "lucide-react"
 import { cn } from "./ui/utils"
 import { useApp } from "../context/AppContext"
@@ -95,9 +99,11 @@ export function AppSidebar({
       url: "/cms",
       items: [
         { title: "Dashboard", url: "/cms/dashboard" },
+        { title: "Hero Banners", url: "/cms/hero-banners" },
         { title: "Berita & Artikel", url: "/cms/news" },
         { title: "Halaman Statis", url: "/cms/pages" },
         { title: "Layanan Publik", url: "/cms/services" },
+        { title: "Dokumen Publik", url: "/cms/documents" },
         { title: "Struktur Organisasi", url: "/cms/staff" },
         { title: "Kategori", url: "/cms/categories" },
         { title: "Pengaturan", url: "/cms/settings" },
@@ -126,8 +132,16 @@ export function AppSidebar({
       icon: Heart,
       url: "/data-sosial",
       items: [
+        { title: "Demografi", url: "/demografi" },
         { title: "Data Kesehatan", url: "/data-sosial/kesehatan" },
         { title: "Data Kemiskinan", url: "/data-sosial/kemiskinan" },
+        { title: "Pola Asuh & Gizi", url: "/data-sosial-baru" },
+        { title: "Infrastruktur Rumah", url: "/data-sosial/infrastruktur" },
+        { title: "Yatim Piatu", url: "/data-sosial/yatim-piatu" },
+        { title: "Lembaga Keagamaan", url: "/data-lembaga/keagamaan" },
+        { title: "Lembaga Pendidikan", url: "/data-lembaga/pendidikan" },
+        { title: "Peternakan", url: "/data-ekonomi/ternak" },
+        { title: "Pajak (PBB)", url: "/data-ekonomi/pbb" },
       ],
     },
     {

@@ -8,6 +8,34 @@ import API_CONFIG from '../config/api.js';
 class CMSService {
   constructor() {
     this.endpoints = API_CONFIG.ENDPOINTS.CMS;
+    this.adminEndpoints = {
+      pages: '/pages',
+      news: '/news',
+      services: '/services', 
+      categories: '/categories',
+      siteSettings: '/site-settings',
+      staff: '/staff',
+      documents: '/documents',
+      heroBanners: '/hero-banners'
+    };
+  }
+
+  /**
+   * Helper method to get admin API base URL for tenant
+   * @param {number} tenantId - ID tenant
+   */
+  getAdminApiUrl(tenantId) {
+    return `${API_CONFIG.BASE_URL}/cms/admin/tenant/${tenantId}`;
+  }
+
+  /**
+   * Check if we should use mock data
+   */
+  shouldUseMockData() {
+    return window.location.hostname === 'localhost' || 
+           window.location.hostname === '127.0.0.1' ||
+           window.location.hostname.includes('figma.com') ||
+           !navigator.onLine;
   }
 
   /**

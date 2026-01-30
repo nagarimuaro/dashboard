@@ -58,7 +58,7 @@ import {
 } from "./ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs"
 import { toast } from "sonner"
-import cmsService from "../services/cmsService"
+import cmsService from "../services/cmsService-fixed"
 
 interface CMSCategoriesProps {
   userRole: string
@@ -85,8 +85,8 @@ export function CMSCategories({ userRole, onModuleChange }: CMSCategoriesProps) 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [categoryToDelete, setCategoryToDelete] = useState(null)
 
-  // Mock tenant ID
-  const tenantId = 1
+  // Get tenant ID from localStorage
+  const tenantId = JSON.parse(localStorage.getItem('current_tenant') || '{}')?.id || 1
 
   // Predefined colors and icons
   const predefinedColors = [

@@ -52,7 +52,7 @@ import {
   DialogTitle,
 } from "./ui/dialog"
 import { toast } from "sonner"
-import cmsService from "../services/cmsService"
+import cmsService from "../services/cmsService-fixed"
 
 interface CMSPagesProps {
   userRole: string
@@ -83,8 +83,8 @@ export function CMSPages({ userRole, onModuleChange }: CMSPagesProps) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [pageToDelete, setPageToDelete] = useState(null)
 
-  // Mock tenant ID
-  const tenantId = 1
+  // Get tenant ID from localStorage
+  const tenantId = JSON.parse(localStorage.getItem('current_tenant') || '{}')?.id || 1
 
   useEffect(() => {
     fetchPages()

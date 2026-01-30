@@ -21,86 +21,61 @@
   - Better error handling
 - **Status**: ✅ COMPLETED
 
-### 4. **Missing Admin Methods**
-- **Problem**: Missing `getAdminCategories` and `getAdminSiteSettings` methods
-- **Fix**: Need to add these methods to cmsService.js
-- **Status**: ⚠️ NEEDS MANUAL ADDITION
+### 4. **Missing Admin Methods in cmsService.js**
+- **Problem**: `cmsService.js` was missing `getAdminApiUrl()` method and `adminEndpoints` configuration
+- **Fix**: Added the following to constructor:
+  - `adminEndpoints` object with paths for pages, news, services, categories, siteSettings, staff, documents, heroBanners
+  - `getAdminApiUrl(tenantId)` method
+  - `shouldUseMockData()` method
+- **Status**: ✅ COMPLETED
 
-## 🔧 Manual Fix Needed
+### 5. **Inconsistent CMS Service Imports**
+- **Problem**: Some components used `cmsService` (old), others used `cmsService-fixed` (new)
+- **Files Fixed**:
+  - `cms-services.tsx` - Changed to cmsService-fixed
+  - `cms-pages.tsx` - Changed to cmsService-fixed  
+  - `cms-categories.tsx` - Changed to cmsService-fixed
+  - `cms-staff.tsx` - Added cmsService-fixed import
+- **Status**: ✅ COMPLETED
 
-Add these methods to the end of the CMS service class in `/services/cmsService.js`:
+### 6. **cms-staff.tsx Not Using CMS Service**
+- **Problem**: Component was using only mock data, not connected to cmsService
+- **Fix**: 
+  - Added import for `cmsService-fixed`
+  - Updated `fetchStaff()` to use `cmsService.getStaff()`
+  - Updated `handleSubmit()` to use `cmsService.createStaff()` and `cmsService.updateStaff()`
+  - Updated `handleDelete()` to use `cmsService.deleteStaff()`
+- **Status**: ✅ COMPLETED
 
-```javascript
-  // Get all categories for admin
-  async getAdminCategories(tenantId, params = {}) {
-    try {
-      if (this.shouldUseMockData()) {
-        console.log('Using mock categories data for development');
-        await new Promise(resolve => setTimeout(resolve, 200));
-        return this.getMockCategoriesData(params);
-      }
+### 7. **apiClient.get() Parameter Format Issue**
+- **Problem**: cmsService-fixed was calling `apiClient.get(url, { params })` but apiClient expected `apiClient.get(url, params)`
+- **Fix**: Updated `apiClient.get()` to support both formats:
+  ```javascript
+  const actualParams = params.params || params;
+  ```
+- **Status**: ✅ COMPLETED
 
-      const url = `${this.getAdminApiUrl(tenantId)}${this.adminEndpoints.categories}`;
-      const response = await apiClient.get(url, { params });
-      return {
-        success: true,
-        data: response.data,
-        message: response.message
-      };
-    } catch (error) {
-      console.error('Error fetching admin categories:', error);
-      await new Promise(resolve => setTimeout(resolve, 100));
-      return this.getMockCategoriesData(params);
-    }
-  }
+### 8. **Hard-coded Tenant ID**
+- **Problem**: All CMS components had `const tenantId = 1` hard-coded
+- **Fix**: Changed all components to get tenant ID from localStorage:
+  ```javascript
+  const tenantId = JSON.parse(localStorage.getItem('current_tenant') || '{}')?.id || 1
+  ```
+- **Files Fixed**:
+  - `cms-services.tsx`
+  - `cms-pages.tsx`
+  - `cms-categories.tsx`
+  - `cms-dashboard.tsx`
+  - `cms-news.tsx`
+  - `cms-news-fixed.tsx`
+  - `cms-settings.tsx`
+  - `cms-staff.tsx`
+- **Status**: ✅ COMPLETED
 
-  // Get admin site settings
-  async getAdminSiteSettings(tenantId) {
-    try {
-      if (this.shouldUseMockData()) {
-        console.log('Using mock site settings for development');
-        await new Promise(resolve => setTimeout(resolve, 300));
-        return this.getMockSiteSettings();
-      }
-
-      const url = `${this.getAdminApiUrl(tenantId)}${this.adminEndpoints.siteSettings}`;
-      const response = await apiClient.get(url);
-      return {
-        success: true,
-        data: response.data,
-        message: response.message
-      };
-    } catch (error) {
-      console.error('Error fetching admin site settings:', error);
-      await new Promise(resolve => setTimeout(resolve, 100));
-      return this.getMockSiteSettings();
-    }
-  }
-
-  // Update site settings
-  async updateSiteSettings(tenantId, settingsData) {
-    try {
-      const url = `${this.getAdminApiUrl(tenantId)}${this.adminEndpoints.siteSettings}`;
-      const response = await apiClient.put(url, settingsData);
-      return {
-        success: true,
-        data: response.data,
-        message: response.message
-      };
-    } catch (error) {
-      console.error('Error updating site settings:', error);
-      await new Promise(resolve => setTimeout(resolve, 500));
-      return {
-        success: true,
-        data: {
-          ...settingsData,
-          updated_at: new Date().toISOString()
-        },
-        message: "Pengaturan situs berhasil diperbarui (development mode)"
-      };
-    }
-  }
-```
+### 9. **CMS Service Export Missing from Index**
+- **Problem**: `cmsService` was not exported from `services/index.js`
+- **Fix**: Added export: `export { default as cmsService } from './cmsService-fixed.js';`
+- **Status**: ✅ COMPLETED
 
 ## 📊 Results
 
@@ -111,6 +86,9 @@ After implementing these fixes:
 - ✅ **Network errors handled gracefully** with mock data
 - ✅ **React ref warnings eliminated**
 - ✅ **All admin API calls work** in development mode
+- ✅ **All CMS components use consistent service** (cmsService-fixed)
+- ✅ **Tenant ID dynamically loaded** from localStorage
+- ✅ **Staff management integrated** with backend API
 
 ## 🚀 Enhanced Features
 
@@ -119,5 +97,9 @@ After implementing these fixes:
 3. **Error Handling**: ✅ Improved
 4. **Mock Data Fallbacks**: ✅ Comprehensive
 5. **Development Mode**: ✅ Fully functional
+6. **Multi-tenant Support**: ✅ Dynamic tenant ID from localStorage
 
 The system now works reliably in both online and offline modes with proper error handling and graceful degradation.
+
+---
+**Last Updated**: December 21, 2025

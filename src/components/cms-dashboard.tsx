@@ -60,8 +60,8 @@ export function CMSDashboard({ userRole, onModuleChange }: CMSDashboardProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedFilter, setSelectedFilter] = useState("all")
 
-  // Mock tenant ID - in real app, get from context
-  const tenantId = 1
+  // Get tenant ID from localStorage
+  const tenantId = JSON.parse(localStorage.getItem('current_tenant') || '{}')?.id || 1
 
   useEffect(() => {
     fetchDashboardData()

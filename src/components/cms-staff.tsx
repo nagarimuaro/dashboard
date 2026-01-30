@@ -67,6 +67,7 @@ import {
 } from "./ui/alert-dialog"
 import { toast } from "sonner"
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar"
+import cmsService from "../services/cmsService-fixed"
 
 interface CMSStaffProps {
   userRole: string
@@ -90,6 +91,22 @@ interface StaffMember {
   end_date?: string
   created_at: string
   updated_at: string
+}
+
+interface StaffFormData {
+  name: string
+  position: string
+  department: string
+  description: string
+  photo: string
+  phone: string
+  email: string
+  whatsapp: string
+  is_leadership: boolean
+  status: string
+  sort_order: number
+  start_date: string
+  end_date: string
 }
 
 // Predefined departments
@@ -130,7 +147,7 @@ export function CMSStaff({ userRole, onModuleChange }: CMSStaffProps) {
   const [departmentFilter, setDepartmentFilter] = useState("all")
   const [showForm, setShowForm] = useState(false)
   const [editingStaff, setEditingStaff] = useState<StaffMember | null>(null)
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<StaffFormData>({
     name: "",
     position: "",
     department: "",
@@ -148,9 +165,10 @@ export function CMSStaff({ userRole, onModuleChange }: CMSStaffProps) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [staffToDelete, setStaffToDelete] = useState<StaffMember | null>(null)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  const [saving, setSaving] = useState(false)
 
-  // Mock tenant ID
-  const tenantId = 1
+  // Get tenant ID from localStorage
+  const tenantId = JSON.parse(localStorage.getItem('current_tenant') || '{}')?.id || 1
 
   useEffect(() => {
     fetchStaff()
@@ -159,90 +177,100 @@ export function CMSStaff({ userRole, onModuleChange }: CMSStaffProps) {
   const fetchStaff = async () => {
     setLoading(true)
     try {
-      // Mock data untuk development
-      await new Promise(resolve => setTimeout(resolve, 500))
+      const params = {
+        ...(searchQuery && { search: searchQuery }),
+        ...(statusFilter !== 'all' && { status: statusFilter }),
+        ...(departmentFilter !== 'all' && { department: departmentFilter })
+      }
+
+      const response = await cmsService.getStaff(tenantId, params)
       
-      const mockStaff: StaffMember[] = [
-        {
-          id: 1,
-          name: "Budi Santoso, S.Pd",
-          position: "Wali Nagari",
-          department: "Wali Nagari",
-          description: "Memimpin penyelenggaraan pemerintahan nagari",
-          phone: "081234567890",
-          email: "wali@nagari.go.id",
-          is_leadership: true,
-          status: "active",
-          sort_order: 1,
-          start_date: "2020-01-01",
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        },
-        {
-          id: 2,
-          name: "Siti Aminah, S.E",
-          position: "Sekretaris Nagari",
-          department: "Sekretaris Nagari",
-          description: "Membantu Wali Nagari dalam tugas administrasi",
-          phone: "081234567891",
-          email: "sekretaris@nagari.go.id",
-          is_leadership: true,
-          status: "active",
-          sort_order: 2,
-          start_date: "2020-01-01",
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        },
-        {
-          id: 3,
-          name: "Ahmad Fauzi",
-          position: "Kepala Urusan",
-          department: "Kaur Keuangan",
-          description: "Mengelola keuangan nagari",
-          phone: "081234567892",
-          is_leadership: false,
-          status: "active",
-          sort_order: 3,
-          start_date: "2021-03-15",
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        },
-        {
-          id: 4,
-          name: "Dewi Lestari",
-          position: "Kepala Seksi",
-          department: "Kasi Pelayanan",
-          description: "Menangani pelayanan publik",
-          phone: "081234567893",
-          is_leadership: false,
-          status: "active",
-          sort_order: 4,
-          start_date: "2022-01-10",
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+      if (response.success && response.data) {
+        setStaff(response.data)
+      } else {
+        // Fallback to mock data
+        const mockStaff: StaffMember[] = [
+          {
+            id: 1,
+            name: "Budi Santoso, S.Pd",
+            position: "Wali Nagari",
+            department: "Wali Nagari",
+            description: "Memimpin penyelenggaraan pemerintahan nagari",
+            phone: "081234567890",
+            email: "wali@nagari.go.id",
+            is_leadership: true,
+            status: "active",
+            sort_order: 1,
+            start_date: "2020-01-01",
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          },
+          {
+            id: 2,
+            name: "Siti Aminah, S.E",
+            position: "Sekretaris Nagari",
+            department: "Sekretaris Nagari",
+            description: "Membantu Wali Nagari dalam tugas administrasi",
+            phone: "081234567891",
+            email: "sekretaris@nagari.go.id",
+            is_leadership: true,
+            status: "active",
+            sort_order: 2,
+            start_date: "2020-01-01",
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          },
+          {
+            id: 3,
+            name: "Ahmad Fauzi",
+            position: "Kepala Urusan",
+            department: "Kaur Keuangan",
+            description: "Mengelola keuangan nagari",
+            phone: "081234567892",
+            is_leadership: false,
+            status: "active",
+            sort_order: 3,
+            start_date: "2021-03-15",
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          },
+          {
+            id: 4,
+            name: "Dewi Lestari",
+            position: "Kepala Seksi",
+            department: "Kasi Pelayanan",
+            description: "Menangani pelayanan publik",
+            phone: "081234567893",
+            is_leadership: false,
+            status: "active",
+            sort_order: 4,
+            start_date: "2022-01-10",
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }
+        ]
+
+        // Apply filters to mock data
+        let filteredStaff = mockStaff
+        
+        if (searchQuery) {
+          filteredStaff = filteredStaff.filter(s => 
+            s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            s.position.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            s.department.toLowerCase().includes(searchQuery.toLowerCase())
+          )
         }
-      ]
+        
+        if (statusFilter !== "all") {
+          filteredStaff = filteredStaff.filter(s => s.status === statusFilter)
+        }
+        
+        if (departmentFilter !== "all") {
+          filteredStaff = filteredStaff.filter(s => s.department === departmentFilter)
+        }
 
-      // Apply filters
-      let filteredStaff = mockStaff
-      
-      if (searchQuery) {
-        filteredStaff = filteredStaff.filter(s => 
-          s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          s.position.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          s.department.toLowerCase().includes(searchQuery.toLowerCase())
-        )
+        setStaff(filteredStaff)
       }
-      
-      if (statusFilter !== "all") {
-        filteredStaff = filteredStaff.filter(s => s.status === statusFilter)
-      }
-      
-      if (departmentFilter !== "all") {
-        filteredStaff = filteredStaff.filter(s => s.department === departmentFilter)
-      }
-
-      setStaff(filteredStaff)
     } catch (error) {
       console.error('Error fetching staff:', error)
       toast.error("Gagal memuat data struktur organisasi")
@@ -259,21 +287,27 @@ export function CMSStaff({ userRole, onModuleChange }: CMSStaffProps) {
       return
     }
 
+    setSaving(true)
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500))
-      
+      let response
       if (editingStaff) {
-        toast.success("Data pejabat berhasil diperbarui")
+        response = await cmsService.updateStaff(tenantId, editingStaff.id, formData)
       } else {
-        toast.success("Pejabat baru berhasil ditambahkan")
+        response = await cmsService.createStaff(tenantId, formData)
       }
-      
-      resetForm()
-      fetchStaff()
+
+      if (response.success) {
+        toast.success(editingStaff ? "Data pejabat berhasil diperbarui" : "Pejabat baru berhasil ditambahkan")
+        resetForm()
+        fetchStaff()
+      } else {
+        toast.error(response.error || "Gagal menyimpan data")
+      }
     } catch (error) {
       console.error('Error saving staff:', error)
       toast.error("Gagal menyimpan data")
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -281,16 +315,30 @@ export function CMSStaff({ userRole, onModuleChange }: CMSStaffProps) {
     if (!staffToDelete) return
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 300))
+      const response = await cmsService.deleteStaff(tenantId, staffToDelete.id)
       
-      toast.success("Data pejabat berhasil dihapus")
-      setDeleteDialogOpen(false)
-      setStaffToDelete(null)
-      fetchStaff()
+      if (response.success) {
+        toast.success("Data pejabat berhasil dihapus")
+        setDeleteDialogOpen(false)
+        setStaffToDelete(null)
+        fetchStaff()
+      } else {
+        toast.error(response.error || "Gagal menghapus data")
+      }
     } catch (error) {
       console.error('Error deleting staff:', error)
       toast.error("Gagal menghapus data")
+    }
+  }
+
+  // Helper function to format date for input
+  const formatDateForInput = (dateString: string | null | undefined): string => {
+    if (!dateString) return "";
+    try {
+      const date = new Date(dateString);
+      return date.toISOString().split('T')[0]; // Returns yyyy-MM-dd
+    } catch {
+      return "";
     }
   }
 
@@ -308,8 +356,8 @@ export function CMSStaff({ userRole, onModuleChange }: CMSStaffProps) {
       is_leadership: member.is_leadership,
       status: member.status,
       sort_order: member.sort_order,
-      start_date: member.start_date || "",
-      end_date: member.end_date || ""
+      start_date: formatDateForInput(member.start_date),
+      end_date: formatDateForInput(member.end_date)
     })
     setShowForm(true)
   }
@@ -385,7 +433,7 @@ export function CMSStaff({ userRole, onModuleChange }: CMSStaffProps) {
                       <Label htmlFor="position">Jabatan *</Label>
                       <Select 
                         value={formData.position} 
-                        onValueChange={(value) => setFormData({...formData, position: value})}
+                        onValueChange={(value: string) => setFormData({...formData, position: value})}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Pilih jabatan" />
@@ -404,7 +452,7 @@ export function CMSStaff({ userRole, onModuleChange }: CMSStaffProps) {
                       <Label htmlFor="department">Bidang/Unit</Label>
                       <Select 
                         value={formData.department} 
-                        onValueChange={(value) => setFormData({...formData, department: value})}
+                        onValueChange={(value: string) => setFormData({...formData, department: value})}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Pilih bidang" />
@@ -517,23 +565,91 @@ export function CMSStaff({ userRole, onModuleChange }: CMSStaffProps) {
                 </CardHeader>
                 <CardContent>
                   <div className="flex flex-col items-center gap-4">
-                    <Avatar className="h-32 w-32">
+                    <div className="h-32 w-32 rounded-full overflow-hidden border-2 border-muted">
                       {formData.photo ? (
-                        <AvatarImage src={formData.photo} alt={formData.name} />
+                        <img 
+                          src={formData.photo} 
+                          alt={formData.name} 
+                          className="w-full h-full object-cover"
+                        />
                       ) : (
-                        <AvatarFallback className="text-2xl bg-primary/10">
-                          {formData.name ? getInitials(formData.name) : <User className="h-12 w-12" />}
-                        </AvatarFallback>
+                        <div className="w-full h-full bg-primary/10 flex items-center justify-center">
+                          {formData.name ? (
+                            <span className="text-2xl font-semibold text-primary">{getInitials(formData.name)}</span>
+                          ) : (
+                            <User className="h-12 w-12 text-muted-foreground" />
+                          )}
+                        </div>
                       )}
-                    </Avatar>
-                    <div className="space-y-2 w-full">
-                      <Label htmlFor="photo">URL Foto</Label>
-                      <Input
-                        id="photo"
-                        value={formData.photo}
-                        onChange={(e) => setFormData({...formData, photo: e.target.value})}
-                        placeholder="https://..."
-                      />
+                    </div>
+                    <div className="space-y-3 w-full">
+                      {/* File Upload Button */}
+                      <div>
+                        <Label>Upload Foto</Label>
+                        <div className="mt-1">
+                          <input
+                            type="file"
+                            id="photo-upload"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              
+                              setUploadingPhoto(true);
+                              try {
+                                const response = await cmsService.uploadStaffPhoto(tenantId, file);
+                                if (response.success && response.data?.url) {
+                                  setFormData({...formData, photo: response.data.url});
+                                  toast.success("Foto berhasil diupload");
+                                } else {
+                                  toast.error(response.error || "Gagal mengupload foto");
+                                }
+                              } catch (error) {
+                                console.error('Upload error:', error);
+                                toast.error("Terjadi kesalahan saat upload");
+                              } finally {
+                                setUploadingPhoto(false);
+                              }
+                            }}
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="w-full"
+                            disabled={uploadingPhoto}
+                            onClick={() => document.getElementById('photo-upload')?.click()}
+                          >
+                            <Upload className="h-4 w-4 mr-2" />
+                            {uploadingPhoto ? "Mengupload..." : "Pilih Foto"}
+                          </Button>
+                        </div>
+                      </div>
+                      
+                      {/* URL Input as alternative */}
+                      <div className="space-y-2">
+                        <Label htmlFor="photo">Atau URL Foto</Label>
+                        <Input
+                          id="photo"
+                          value={formData.photo}
+                          onChange={(e) => setFormData({...formData, photo: e.target.value})}
+                          placeholder="https://..."
+                        />
+                      </div>
+                      
+                      {/* Remove photo button */}
+                      {formData.photo && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="text-red-500 w-full"
+                          onClick={() => setFormData({...formData, photo: ""})}
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Hapus Foto
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </CardContent>
@@ -548,7 +664,7 @@ export function CMSStaff({ userRole, onModuleChange }: CMSStaffProps) {
                     <Label>Status</Label>
                     <Select 
                       value={formData.status} 
-                      onValueChange={(value) => setFormData({...formData, status: value})}
+                      onValueChange={(value: string) => setFormData({...formData, status: value})}
                     >
                       <SelectTrigger>
                         <SelectValue />
@@ -569,19 +685,19 @@ export function CMSStaff({ userRole, onModuleChange }: CMSStaffProps) {
                     </div>
                     <Switch
                       checked={formData.is_leadership}
-                      onCheckedChange={(checked) => setFormData({...formData, is_leadership: checked})}
+                      onCheckedChange={(checked: boolean) => setFormData({...formData, is_leadership: checked})}
                     />
                   </div>
                 </CardContent>
               </Card>
 
               <div className="flex gap-3">
-                <Button type="button" variant="outline" onClick={resetForm} className="flex-1">
+                <Button type="button" variant="outline" onClick={resetForm} className="flex-1" disabled={saving}>
                   Batal
                 </Button>
-                <Button type="submit" className="flex-1">
+                <Button type="submit" className="flex-1" disabled={saving || uploadingPhoto}>
                   <Save className="h-4 w-4 mr-2" />
-                  Simpan
+                  {saving ? "Menyimpan..." : "Simpan"}
                 </Button>
               </div>
             </div>

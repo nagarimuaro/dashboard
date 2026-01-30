@@ -348,17 +348,10 @@ class CMSService {
       };
     } catch (error) {
       console.error('Error uploading news image:', error);
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      const mockUrl = URL.createObjectURL(file);
       return {
-        success: true,
-        data: {
-          url: mockUrl,
-          filename: file.name,
-          size: file.size
-        },
-        message: "Gambar berhasil diupload (development mode)"
+        success: false,
+        error: error?.response?.data?.message || error?.message || "Gagal mengupload gambar",
+        data: null
       };
     }
   }
@@ -574,18 +567,495 @@ class CMSService {
       };
     } catch (error) {
       console.error('Error uploading logo:', error);
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      const mockUrl = URL.createObjectURL(file);
+      return {
+        success: false,
+        error: error.message,
+        message: "Gagal mengupload logo"
+      };
+    }
+  }
+
+  // ========================================
+  // HERO BANNERS ADMIN API
+  // ========================================
+
+  async getHeroBanners(tenantId) {
+    try {
+      const url = `${this.getAdminApiUrl(tenantId)}/hero-banners`;
+      const response = await apiClient.get(url);
       return {
         success: true,
-        data: {
-          url: mockUrl,
-          filename: file.name,
-          size: file.size
-        },
-        message: "Logo berhasil diupload (development mode)"
+        data: response.data,
+        message: response.message
       };
+    } catch (error) {
+      console.error('Error fetching hero banners:', error);
+      return { success: false, error: error.message, data: [] };
+    }
+  }
+
+  async createHeroBanner(tenantId, bannerData, imageFile = null, mobileImageFile = null) {
+    try {
+      const url = `${this.getAdminApiUrl(tenantId)}/hero-banners`;
+      
+      // Fields to exclude from FormData (not part of backend validation)
+      const excludeFields = ['image_url', 'mobile_image_url'];
+      
+      // Use FormData if there are files to upload
+      if (imageFile || mobileImageFile) {
+        const formData = new FormData();
+        
+        // Add all text fields
+        Object.keys(bannerData).forEach(key => {
+          // Skip excluded fields
+          if (excludeFields.includes(key)) return;
+          
+          const value = bannerData[key];
+          
+          // Skip null/undefined
+          if (value === null || value === undefined) return;
+          
+          // Handle boolean properly
+          if (typeof value === 'boolean') {
+            formData.append(key, value ? '1' : '0');
+          } 
+          // Skip empty strings for optional fields
+          else if (value === '' && key !== 'title') {
+            return;
+          }
+          else {
+            formData.append(key, value);
+          }
+        });
+        
+        // Add files
+        if (imageFile) {
+          formData.append('image', imageFile);
+        }
+        if (mobileImageFile) {
+          formData.append('mobile_image', mobileImageFile);
+        }
+        
+        const response = await apiClient.post(url, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        return {
+          success: true,
+          data: response.data,
+          message: response.message || 'Banner berhasil dibuat'
+        };
+      } else {
+        // No files, send as JSON - clean up the data
+        const cleanData = {};
+        Object.keys(bannerData).forEach(key => {
+          if (excludeFields.includes(key)) return;
+          const value = bannerData[key];
+          if (value !== null && value !== undefined && value !== '') {
+            cleanData[key] = value;
+          }
+        });
+        
+        const response = await apiClient.post(url, cleanData);
+        return {
+          success: true,
+          data: response.data,
+          message: response.message || 'Banner berhasil dibuat'
+        };
+      }
+    } catch (error) {
+      console.error('Error creating hero banner:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async updateHeroBanner(tenantId, bannerId, bannerData, imageFile = null, mobileImageFile = null) {
+    try {
+      const url = `${this.getAdminApiUrl(tenantId)}/hero-banners/${bannerId}`;
+      
+      // Fields to exclude from FormData (not part of backend validation)
+      const excludeFields = ['image_url', 'mobile_image_url', 'id', 'created_at', 'updated_at', 'tenant_id', 'thumb_url'];
+      
+      // Use FormData if there are files to upload
+      if (imageFile || mobileImageFile) {
+        const formData = new FormData();
+        
+        // Add _method for Laravel to recognize PUT request
+        formData.append('_method', 'PUT');
+        
+        // Add all text fields
+        Object.keys(bannerData).forEach(key => {
+          // Skip excluded fields
+          if (excludeFields.includes(key)) return;
+          
+          const value = bannerData[key];
+          
+          // Skip null/undefined
+          if (value === null || value === undefined) return;
+          
+          // Handle boolean properly
+          if (typeof value === 'boolean') {
+            formData.append(key, value ? '1' : '0');
+          }
+          // Skip empty strings for optional fields
+          else if (value === '' && key !== 'title') {
+            return;
+          }
+          else {
+            formData.append(key, value);
+          }
+        });
+        
+        // Add files
+        if (imageFile) {
+          formData.append('image', imageFile);
+        }
+        if (mobileImageFile) {
+          formData.append('mobile_image', mobileImageFile);
+        }
+        
+        // Use POST with _method=PUT for file uploads
+        const response = await apiClient.post(url, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        return {
+          success: true,
+          data: response.data,
+          message: response.message || 'Banner berhasil diperbarui'
+        };
+      } else {
+        // No files, send as JSON with PUT - clean up the data
+        const cleanData = {};
+        Object.keys(bannerData).forEach(key => {
+          if (excludeFields.includes(key)) return;
+          const value = bannerData[key];
+          if (value !== null && value !== undefined && value !== '') {
+            cleanData[key] = value;
+          }
+        });
+        
+        const response = await apiClient.put(url, cleanData);
+        return {
+          success: true,
+          data: response.data,
+          message: response.message || 'Banner berhasil diperbarui'
+        };
+      }
+    } catch (error) {
+      console.error('Error updating hero banner:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async deleteHeroBanner(tenantId, bannerId) {
+    try {
+      const url = `${this.getAdminApiUrl(tenantId)}/hero-banners/${bannerId}`;
+      const response = await apiClient.delete(url);
+      return {
+        success: true,
+        message: response.message || 'Banner berhasil dihapus'
+      };
+    } catch (error) {
+      console.error('Error deleting hero banner:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async uploadBannerImage(tenantId, file) {
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+
+      const url = `${this.getAdminApiUrl(tenantId)}/hero-banners/upload-image`;
+      const response = await apiClient.post(url, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      return {
+        success: true,
+        data: response.data,
+        message: response.message
+      };
+    } catch (error) {
+      console.error('Error uploading banner image:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // ========================================
+  // STAFF/APARATUR ADMIN API
+  // ========================================
+
+  async getStaff(tenantId, params = {}) {
+    try {
+      const url = `${this.getAdminApiUrl(tenantId)}/staff`;
+      const response = await apiClient.get(url, { params });
+      return {
+        success: true,
+        data: response.data,
+        message: response.message
+      };
+    } catch (error) {
+      console.error('Error fetching staff:', error);
+      return { success: false, error: error.message, data: [] };
+    }
+  }
+
+  async createStaff(tenantId, staffData) {
+    try {
+      const url = `${this.getAdminApiUrl(tenantId)}/staff`;
+      const response = await apiClient.post(url, staffData);
+      return {
+        success: true,
+        data: response.data,
+        message: response.message || 'Staff berhasil ditambahkan'
+      };
+    } catch (error) {
+      console.error('Error creating staff:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async updateStaff(tenantId, staffId, staffData) {
+    try {
+      const url = `${this.getAdminApiUrl(tenantId)}/staff/${staffId}`;
+      const response = await apiClient.put(url, staffData);
+      return {
+        success: true,
+        data: response.data,
+        message: response.message || 'Staff berhasil diperbarui'
+      };
+    } catch (error) {
+      console.error('Error updating staff:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async deleteStaff(tenantId, staffId) {
+    try {
+      const url = `${this.getAdminApiUrl(tenantId)}/staff/${staffId}`;
+      const response = await apiClient.delete(url);
+      return {
+        success: true,
+        message: response.message || 'Staff berhasil dihapus'
+      };
+    } catch (error) {
+      console.error('Error deleting staff:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async uploadStaffPhoto(tenantId, file) {
+    try {
+      const formData = new FormData();
+      formData.append('photo', file);
+
+      const url = `${this.getAdminApiUrl(tenantId)}/staff/upload-photo`;
+      // Don't set Content-Type header - browser will set it automatically with boundary
+      const response = await apiClient.post(url, formData);
+      return {
+        success: true,
+        data: response.data,
+        message: response.message
+      };
+    } catch (error) {
+      console.error('Error uploading staff photo:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // ========================================
+  // DOCUMENTS ADMIN API
+  // ========================================
+
+  async getDocuments(tenantId, params = {}) {
+    try {
+      const url = `${this.getAdminApiUrl(tenantId)}/documents`;
+      const response = await apiClient.get(url, { params });
+      return {
+        success: true,
+        data: response.data,
+        meta: response.meta,
+        message: response.message
+      };
+    } catch (error) {
+      console.error('Error fetching documents:', error);
+      return { success: false, error: error.message, data: [] };
+    }
+  }
+
+  async createDocument(tenantId, documentData) {
+    try {
+      const url = `${this.getAdminApiUrl(tenantId)}/documents`;
+      const response = await apiClient.post(url, documentData);
+      return {
+        success: true,
+        data: response.data,
+        message: response.message || 'Dokumen berhasil dibuat'
+      };
+    } catch (error) {
+      console.error('Error creating document:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async updateDocument(tenantId, documentId, documentData) {
+    try {
+      const url = `${this.getAdminApiUrl(tenantId)}/documents/${documentId}`;
+      const response = await apiClient.put(url, documentData);
+      return {
+        success: true,
+        data: response.data,
+        message: response.message || 'Dokumen berhasil diperbarui'
+      };
+    } catch (error) {
+      console.error('Error updating document:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async deleteDocument(tenantId, documentId) {
+    try {
+      const url = `${this.getAdminApiUrl(tenantId)}/documents/${documentId}`;
+      const response = await apiClient.delete(url);
+      return {
+        success: true,
+        message: response.message || 'Dokumen berhasil dihapus'
+      };
+    } catch (error) {
+      console.error('Error deleting document:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async uploadDocument(tenantId, file, metadata = {}) {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      Object.keys(metadata).forEach(key => {
+        formData.append(key, metadata[key]);
+      });
+
+      const url = `${this.getAdminApiUrl(tenantId)}/documents/upload`;
+      const response = await apiClient.post(url, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      return {
+        success: true,
+        data: response.data,
+        message: response.message
+      };
+    } catch (error) {
+      console.error('Error uploading document:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // ========================================
+  // SERVICES ADMIN API
+  // ========================================
+
+  async createService(tenantId, serviceData) {
+    try {
+      const url = `${this.getAdminApiUrl(tenantId)}/services`;
+      const response = await apiClient.post(url, serviceData);
+      return {
+        success: true,
+        data: response.data,
+        message: response.message || 'Layanan berhasil dibuat'
+      };
+    } catch (error) {
+      console.error('Error creating service:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async updateService(tenantId, serviceId, serviceData) {
+    try {
+      const url = `${this.getAdminApiUrl(tenantId)}/services/${serviceId}`;
+      const response = await apiClient.put(url, serviceData);
+      return {
+        success: true,
+        data: response.data,
+        message: response.message || 'Layanan berhasil diperbarui'
+      };
+    } catch (error) {
+      console.error('Error updating service:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async deleteService(tenantId, serviceId) {
+    try {
+      const url = `${this.getAdminApiUrl(tenantId)}/services/${serviceId}`;
+      const response = await apiClient.delete(url);
+      return {
+        success: true,
+        message: response.message || 'Layanan berhasil dihapus'
+      };
+    } catch (error) {
+      console.error('Error deleting service:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // ========================================
+  // CATEGORIES ADMIN API
+  // ========================================
+
+  async createCategory(tenantId, categoryData) {
+    try {
+      const url = `${this.getAdminApiUrl(tenantId)}/categories`;
+      const response = await apiClient.post(url, categoryData);
+      return {
+        success: true,
+        data: response.data,
+        message: response.message || 'Kategori berhasil dibuat'
+      };
+    } catch (error) {
+      console.error('Error creating category:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async updateCategory(tenantId, categoryId, categoryData) {
+    try {
+      const url = `${this.getAdminApiUrl(tenantId)}/categories/${categoryId}`;
+      const response = await apiClient.put(url, categoryData);
+      return {
+        success: true,
+        data: response.data,
+        message: response.message || 'Kategori berhasil diperbarui'
+      };
+    } catch (error) {
+      console.error('Error updating category:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async deleteCategory(tenantId, categoryId) {
+    try {
+      const url = `${this.getAdminApiUrl(tenantId)}/categories/${categoryId}`;
+      const response = await apiClient.delete(url);
+      return {
+        success: true,
+        message: response.message || 'Kategori berhasil dihapus'
+      };
+    } catch (error) {
+      console.error('Error deleting category:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async updateCategoriesOrder(tenantId, orderedIds) {
+    try {
+      const url = `${this.getAdminApiUrl(tenantId)}/categories/order`;
+      const response = await apiClient.put(url, { order: orderedIds });
+      return {
+        success: true,
+        message: response.message || 'Urutan kategori berhasil diperbarui'
+      };
+    } catch (error) {
+      console.error('Error updating categories order:', error);
+      return { success: false, error: error.message };
     }
   }
 }

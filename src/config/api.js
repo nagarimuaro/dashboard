@@ -139,22 +139,68 @@ const API_CONFIG = {
 
     // CMS Endpoints (Based on Laravel routes)
     CMS: {
-      // Public CMS endpoints (no auth required)
-      PUBLIC: {
-        SITE_SETTINGS: '/cms/public/site-settings',
-        PAGES: '/cms/public/pages',
-        NEWS: '/cms/public/news',
-        SERVICES: '/cms/public/services',
-        CATEGORIES: '/cms/public/categories'
-      },
-      // Admin CMS endpoints (auth required)
+      // Public CMS endpoints (no auth required, tenant scoped via subdomain)
+      SITE_SETTINGS: '/cms/public/site-settings',
+      PAGES: '/cms/public/pages',
+      NEWS: '/cms/public/news',
+      NEWS_DETAIL: '/cms/public/news',
+      SERVICES: '/cms/public/services',
+      STAFF: '/cms/public/staff',
+      KATA_SAMBUTAN: '/cms/public/kata-sambutan',
+      DOCUMENTS: '/cms/public/documents',
+      HERO_BANNERS: '/cms/public/hero-banners',
+      CATEGORIES: '/cms/public/categories',
+      NAVIGATION_MENU: '/cms/public/navigation-menu',
+      
+      // Admin CMS endpoints (auth required) - URL format: /cms/admin/tenant/{tenantId}/...
       ADMIN: {
+        // Site Settings
         SITE_SETTINGS: '/cms/admin/tenant/{tenantId}/site-settings',
+        UPLOAD_LOGO: '/cms/admin/tenant/{tenantId}/site-settings/upload-logo',
+        
+        // Categories CRUD
         CATEGORIES: '/cms/admin/tenant/{tenantId}/categories',
+        CATEGORIES_ORDER: '/cms/admin/tenant/{tenantId}/categories/order',
+        
+        // News CRUD
         NEWS: '/cms/admin/tenant/{tenantId}/news',
+        NEWS_BULK_DELETE: '/cms/admin/tenant/{tenantId}/news/bulk-delete',
+        NEWS_BULK_STATUS: '/cms/admin/tenant/{tenantId}/news/bulk-status',
+        
+        // Pages CRUD
         PAGES: '/cms/admin/tenant/{tenantId}/pages',
-        SERVICES: '/cms/admin/tenant/{tenantId}/services'
+        
+        // Services CRUD
+        SERVICES: '/cms/admin/tenant/{tenantId}/services',
+        SERVICES_ORDER: '/cms/admin/tenant/{tenantId}/services/order',
       }
+    },
+    
+    // Hero Banners Admin (Filament based - use CMS admin pattern)
+    HERO_BANNERS: {
+      LIST: '/cms/admin/tenant/{tenantId}/hero-banners',
+      CREATE: '/cms/admin/tenant/{tenantId}/hero-banners',
+      UPDATE: '/cms/admin/tenant/{tenantId}/hero-banners/{id}',
+      DELETE: '/cms/admin/tenant/{tenantId}/hero-banners/{id}',
+      ORDER: '/cms/admin/tenant/{tenantId}/hero-banners/order',
+    },
+    
+    // Staff/Aparatur Admin
+    STAFF: {
+      LIST: '/cms/admin/tenant/{tenantId}/staff',
+      CREATE: '/cms/admin/tenant/{tenantId}/staff',
+      UPDATE: '/cms/admin/tenant/{tenantId}/staff/{id}',
+      DELETE: '/cms/admin/tenant/{tenantId}/staff/{id}',
+      ORDER: '/cms/admin/tenant/{tenantId}/staff/order',
+    },
+    
+    // Documents Admin
+    DOCUMENTS: {
+      LIST: '/cms/admin/tenant/{tenantId}/documents',
+      CREATE: '/cms/admin/tenant/{tenantId}/documents',
+      UPDATE: '/cms/admin/tenant/{tenantId}/documents/{id}',
+      DELETE: '/cms/admin/tenant/{tenantId}/documents/{id}',
+      UPLOAD: '/cms/admin/tenant/{tenantId}/documents/upload',
     }
   }
 };

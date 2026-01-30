@@ -7,7 +7,7 @@ import { Users, FileText, Clock, CheckCircle, UserPlus, FileCheck, Eye, Download
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from "recharts"
 import { dashboardService } from '../services/dashboardService'
 
-// Canvas Analog Clock Component
+// Modern Analog Clock Component
 function AnalogClock() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -18,126 +18,110 @@ function AnalogClock() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const radius = canvas.height / 2 * 0.90;
+    const radius = canvas.height / 2 * 0.85;
 
     function drawClock() {
-      // Reset transform and clear
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.translate(canvas.width / 2, canvas.height / 2);
       
       drawFace(ctx, radius);
-      drawNumbers(ctx, radius);
       drawTime(ctx, radius);
     }
 
     function drawFace(ctx: CanvasRenderingContext2D, radius: number) {
-      // Clean white/light gray clock face
+      // Outer glow effect
+      ctx.beginPath();
+      ctx.arc(0, 0, radius * 1.08, 0, 2 * Math.PI);
+      ctx.fillStyle = 'rgba(59, 130, 246, 0.1)';
+      ctx.fill();
+
+      // Main clock face - gradient
       const faceGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, radius);
       faceGrad.addColorStop(0, '#ffffff');
-      faceGrad.addColorStop(0.8, '#f8fafc');
-      faceGrad.addColorStop(1, '#f1f5f9');
+      faceGrad.addColorStop(0.95, '#f8fafc');
+      faceGrad.addColorStop(1, '#e2e8f0');
       ctx.beginPath();
       ctx.arc(0, 0, radius, 0, 2 * Math.PI);
       ctx.fillStyle = faceGrad;
       ctx.fill();
 
-      // Professional blue border (matching primary color)
+      // Border ring
       ctx.beginPath();
       ctx.arc(0, 0, radius, 0, 2 * Math.PI);
       ctx.strokeStyle = '#3b82f6';
-      ctx.lineWidth = radius * 0.06;
-      ctx.stroke();
-
-      // Inner subtle ring
-      ctx.beginPath();
-      ctx.arc(0, 0, radius * 0.92, 0, 2 * Math.PI);
-      ctx.strokeStyle = '#e2e8f0';
-      ctx.lineWidth = 1;
+      ctx.lineWidth = radius * 0.04;
       ctx.stroke();
 
       // Hour markers
       for (let i = 0; i < 12; i++) {
         const ang = i * Math.PI / 6;
-        const x1 = Math.sin(ang) * radius * 0.82;
-        const y1 = -Math.cos(ang) * radius * 0.82;
-        const x2 = Math.sin(ang) * radius * (i % 3 === 0 ? 0.70 : 0.75);
-        const y2 = -Math.cos(ang) * radius * (i % 3 === 0 ? 0.70 : 0.75);
+        const isMain = i % 3 === 0;
+        const innerR = isMain ? 0.72 : 0.78;
+        const outerR = 0.88;
         
         ctx.beginPath();
-        ctx.moveTo(x1, y1);
-        ctx.lineTo(x2, y2);
-        ctx.strokeStyle = i % 3 === 0 ? '#1e40af' : '#94a3b8';
-        ctx.lineWidth = i % 3 === 0 ? 3 : 1.5;
+        ctx.moveTo(Math.sin(ang) * radius * innerR, -Math.cos(ang) * radius * innerR);
+        ctx.lineTo(Math.sin(ang) * radius * outerR, -Math.cos(ang) * radius * outerR);
+        ctx.strokeStyle = isMain ? '#1e40af' : '#94a3b8';
+        ctx.lineWidth = isMain ? 3 : 1.5;
         ctx.lineCap = 'round';
         ctx.stroke();
       }
 
-      // Center circle (blue)
+      // Center dot
       ctx.beginPath();
       ctx.arc(0, 0, radius * 0.06, 0, 2 * Math.PI);
       ctx.fillStyle = '#3b82f6';
       ctx.fill();
     }
 
-    function drawNumbers(ctx: CanvasRenderingContext2D, radius: number) {
-      // Using line markers instead of numbers for cleaner look
-    }
-
     function drawTime(ctx: CanvasRenderingContext2D, radius: number) {
       const now = new Date();
-      let hour = now.getHours();
-      let minute = now.getMinutes();
-      let second = now.getSeconds();
+      const hour = now.getHours() % 12;
+      const minute = now.getMinutes();
+      const second = now.getSeconds();
 
-      // Hour hand (dark blue)
-      ctx.strokeStyle = '#1e3a5f';
-      ctx.shadowBlur = 0;
-      hour = hour % 12;
-      const hourAngle = (hour * Math.PI / 6) +
-        (minute * Math.PI / (6 * 60)) +
-        (second * Math.PI / (360 * 60));
-      drawHand(ctx, hourAngle, radius * 0.5, radius * 0.055);
+      // Hour hand
+      const hourAngle = (hour * Math.PI / 6) + (minute * Math.PI / 360);
+      drawHand(ctx, hourAngle, radius * 0.5, radius * 0.05, '#1e3a5f');
 
-      // Minute hand (dark blue)
-      ctx.strokeStyle = '#1e3a5f';
-      const minuteAngle = (minute * Math.PI / 30) + (second * Math.PI / (30 * 60));
-      drawHand(ctx, minuteAngle, radius * 0.72, radius * 0.04);
+      // Minute hand
+      const minuteAngle = (minute * Math.PI / 30) + (second * Math.PI / 1800);
+      drawHand(ctx, minuteAngle, radius * 0.7, radius * 0.035, '#1e3a5f');
 
-      // Second hand (blue accent)
-      ctx.strokeStyle = '#3b82f6';
-      const secondAngle = (second * Math.PI / 30);
-      drawHand(ctx, secondAngle, radius * 0.9, radius * 0.02);
+      // Second hand
+      const secondAngle = second * Math.PI / 30;
+      drawHand(ctx, secondAngle, radius * 0.85, radius * 0.015, '#ef4444');
+      
+      // Second hand center cap
+      ctx.beginPath();
+      ctx.arc(0, 0, radius * 0.03, 0, 2 * Math.PI);
+      ctx.fillStyle = '#ef4444';
+      ctx.fill();
     }
 
-    function drawHand(ctx: CanvasRenderingContext2D, pos: number, length: number, width: number) {
+    function drawHand(ctx: CanvasRenderingContext2D, angle: number, length: number, width: number, color: string) {
       ctx.beginPath();
       ctx.lineWidth = width;
-      ctx.lineCap = "round";
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = color;
       ctx.moveTo(0, 0);
-      ctx.rotate(pos);
-      ctx.lineTo(0, -length);
+      ctx.lineTo(Math.sin(angle) * length, -Math.cos(angle) * length);
       ctx.stroke();
-      ctx.rotate(-pos);
     }
 
-    // Initial draw
     drawClock();
-
-    // Update every second
     const timer = setInterval(drawClock, 1000);
-
-    return () => {
-      clearInterval(timer);
-    };
+    return () => clearInterval(timer);
   }, []);
 
   return (
     <canvas
       ref={canvasRef}
-      width={160}
-      height={160}
-      className="rounded-full shadow-lg"
+      width={140}
+      height={140}
+      className="rounded-full"
     />
   );
 }

@@ -123,8 +123,8 @@ export function CMSNews({ userRole, onModuleChange }: CMSNewsProps) {
   const [bulkAction, setBulkAction] = useState("")
   const [imageGalleryOpen, setImageGalleryOpen] = useState(false)
 
-  // Mock tenant ID
-  const tenantId = 1
+  // Get tenant ID from localStorage
+  const tenantId = JSON.parse(localStorage.getItem('current_tenant') || '{}')?.id || 1
 
   useEffect(() => {
     fetchNews()
@@ -227,7 +227,7 @@ export function CMSNews({ userRole, onModuleChange }: CMSNewsProps) {
       is_featured: newsItem.is_featured || false,
       tags: newsItem.tags ? (Array.isArray(newsItem.tags) ? newsItem.tags.join(', ') : newsItem.tags) : "",
       published_at: newsItem.published_at ? new Date(newsItem.published_at).toISOString().slice(0, 16) : "",
-      featured_image: newsItem.featured_image || "",
+      featured_image: newsItem.featured_image_url || newsItem.featured_image || "",
       images: newsItem.images || []
     })
     setShowForm(true)
@@ -557,8 +557,11 @@ export function CMSNews({ userRole, onModuleChange }: CMSNewsProps) {
   }
 
   const getThumbnailImage = (newsItem: any) => {
-    // Priority: featured_image > first image from images array > default
-    if (newsItem?.featured_image) {
+    // Priority: featured_image_url > featured_image > first image from images array > default
+    if (newsItem?.featured_image_url) {
+      return newsItem.featured_image_url
+    }
+    if (newsItem?.featured_image && newsItem.featured_image.startsWith('http')) {
       return newsItem.featured_image
     }
     if (newsItem?.images && Array.isArray(newsItem.images) && newsItem.images.length > 0) {

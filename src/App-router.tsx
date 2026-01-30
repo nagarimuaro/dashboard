@@ -12,7 +12,7 @@ import { KeluargaDetailPage } from './pages/KeluargaDetailPage'
 import { WargaTestPage } from './pages/WargaTestPage'
 import { PermohonanSuratPage, KelolaPermohonanPage, GISMapPage, TemplateManagerPage, KeuanganDashboardPage } from './pages/PelayananPages'
 import { LayananSuratPage, PengaduanPage, ArsipSuratPage, UserManagementPage, SettingsPage, ProfilePage } from './pages/SystemPages'
-import { CMSDashboardPage, CMSNewsPage, CMSPagesPage, CMSServicesPage, CMSStaffPage, CMSCategoriesPage, CMSSettingsPage } from './pages/CMSPages'
+import { CMSDashboardPage, CMSNewsPage, CMSPagesPage, CMSServicesPage, CMSStaffPage, CMSCategoriesPage, CMSSettingsPage, CMSHeroBannersPage, CMSDocumentsPage } from './pages/CMSPages'
 import { 
   SuratDomisiliPage, SuratPindahPage, SuratKelahiranPage, SuratKematianPage, 
   SuratBelumMenikahPage, SuratNikahPage, SuratJandaDudaPage, SuratPenghasilanPage, 
@@ -41,6 +41,10 @@ import DataSosialIndexPage from './pages/DataSosialIndexPage'
 import DataKesehatanPage from './pages/DataKesehatanPage'
 import DataKemiskinanPage from './pages/DataKemiskinanPage'
 import StatistikSosialPage from './pages/StatistikSosialPage'
+import DemografiPage from './pages/DemografiPage'
+import DataSosialBaruIndexPage from './pages/DataSosialBaruIndexPage'
+import DataLembagaIndexPage from './pages/DataLembagaIndexPage'
+import DataEkonomiIndexPage from './pages/DataEkonomiIndexPage'
 import { KaderManagementPage, KelompokKaderManagementPage, KaderTugasPage, KaderPerformancePage, KaderKehamilanPage, KaderImunisasiPage, KaderPersalinanPage } from './pages/KaderPages'
 import { JorongPage } from './pages/WilayahPages'
 import { UmkmDirektoriPage, UmkmKategoriPage } from './pages/UmkmPages'
@@ -160,6 +164,7 @@ function App() {
 
             {/* Data Sosial */}
             <Route path="statistik-sosial" element={<StatistikSosialPage />} />
+            <Route path="demografi" element={<DemografiPage />} />
             <Route path="data-sosial">
               <Route index element={<DataKesehatanPage />} />
               {/* Halaman Grup: Kesehatan (Stunting, KB, Disabilitas) */}
@@ -172,8 +177,30 @@ function App() {
               <Route path="disabilitas" element={<DataSosialPage type="disabilitas" />} />
               <Route path="rtlh" element={<DataSosialPage type="rtlh" />} />
               <Route path="putus-sekolah" element={<DataSosialPage type="putus-sekolah" />} />
+              {/* Data Sosial Baru - di dalam data-sosial */}
+              <Route path="infrastruktur" element={<DataSosialBaruIndexPage />} />
+              <Route path="yatim-piatu" element={<DataSosialBaruIndexPage />} />
               {/* Detail pages */}
               <Route path=":type/:id" element={<DataSosialDetailWrapper />} />
+            </Route>
+
+            {/* Data Sosial Baru - standalone route */}
+            <Route path="data-sosial-baru">
+              <Route index element={<DataSosialBaruIndexPage />} />
+            </Route>
+
+            {/* Data Lembaga */}
+            <Route path="data-lembaga">
+              <Route index element={<DataLembagaIndexPage />} />
+              <Route path="keagamaan" element={<DataLembagaIndexPage />} />
+              <Route path="pendidikan" element={<DataLembagaIndexPage />} />
+            </Route>
+
+            {/* Data Ekonomi */}
+            <Route path="data-ekonomi">
+              <Route index element={<DataEkonomiIndexPage />} />
+              <Route path="ternak" element={<DataEkonomiIndexPage />} />
+              <Route path="pbb" element={<DataEkonomiIndexPage />} />
             </Route>
 
             {/* Keuangan */}
@@ -206,6 +233,8 @@ function App() {
               <Route path="services" element={<CMSServicesPage />} />
               <Route path="staff" element={<CMSStaffPage />} />
               <Route path="categories" element={<CMSCategoriesPage />} />
+              <Route path="hero-banners" element={<CMSHeroBannersPage />} />
+              <Route path="documents" element={<CMSDocumentsPage />} />
               <Route path="settings" element={<CMSSettingsPage />} />
             </Route>
 

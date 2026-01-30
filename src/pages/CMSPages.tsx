@@ -6,6 +6,8 @@ import { CMSPages } from '../components/cms-pages'
 import { CMSServices } from '../components/cms-services'
 import { CMSCategories } from '../components/cms-categories'
 import { CMSStaff } from '../components/cms-staff'
+import { CMSHeroBanners } from '../components/cms-hero-banners'
+import { CMSDocuments } from '../components/cms-documents'
 import { useApp } from '../context/AppContext'
 
 export function CMSDashboardPage() {
@@ -114,6 +116,38 @@ export function CMSSettingsPage() {
   
   return (
     <CMSSettings 
+      userRole={userRole as 'admin_global' | 'admin_nagari' | 'staff_nagari' | 'warga'}
+      onModuleChange={handleModuleChange}
+    />
+  )
+}
+
+export function CMSHeroBannersPage() {
+  const { user } = useApp()
+  const userRole = user?.role || 'admin_nagari'
+  
+  const handleModuleChange = (module: string) => {
+    console.log('Module changed to:', module)
+  }
+  
+  return (
+    <CMSHeroBanners 
+      userRole={userRole as 'admin_global' | 'admin_nagari' | 'staff_nagari' | 'warga'}
+      onModuleChange={handleModuleChange}
+    />
+  )
+}
+
+export function CMSDocumentsPage() {
+  const { user } = useApp()
+  const userRole = user?.role || 'admin_nagari'
+  
+  const handleModuleChange = (module: string) => {
+    console.log('Module changed to:', module)
+  }
+  
+  return (
+    <CMSDocuments 
       userRole={userRole as 'admin_global' | 'admin_nagari' | 'staff_nagari' | 'warga'}
       onModuleChange={handleModuleChange}
     />

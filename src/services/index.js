@@ -8,6 +8,7 @@ export { dashboardService } from './dashboardService.js';
 export { userService } from './userService.js';
 export { default as apiClient } from './apiClient.js';
 export { default as socialDataService } from './socialDataService.js';
+export { default as cmsService } from './cmsService-fixed.js';
 
 // Legacy inline userService (will be removed)
 export const legacyUserService = {

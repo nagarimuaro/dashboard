@@ -288,10 +288,13 @@ class ApiClient {
 
   // Convenience methods
   async get(endpoint, params = {}) {
+    // Support both { params: {...} } format and direct params format
+    const actualParams = params.params || params;
+    
     // Build query string
-    const queryString = Object.keys(params)
-      .filter(key => params[key] !== undefined && params[key] !== null)
-      .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(params[key])}`)
+    const queryString = Object.keys(actualParams)
+      .filter(key => actualParams[key] !== undefined && actualParams[key] !== null)
+      .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(actualParams[key])}`)
       .join('&');
     
     const fullEndpoint = queryString ? `${endpoint}?${queryString}` : endpoint;

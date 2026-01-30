@@ -122,8 +122,8 @@ export function CMSSettings({ userRole, onModuleChange }: CMSSettingsProps) {
   const [deletePageDialogOpen, setDeletePageDialogOpen] = useState(false)
   const [pageToDelete, setPageToDelete] = useState(null)
 
-  // Mock tenant ID
-  const tenantId = 1
+  // Get tenant ID from localStorage
+  const tenantId = JSON.parse(localStorage.getItem('current_tenant') || '{}')?.id || 1
 
   useEffect(() => {
     fetchSettings()
